@@ -1,3 +1,4 @@
-public/builds
-public/deployedVM
-public/nightly
+public/builds/
+public/deployedVM/
+public/nightly/
+.env
