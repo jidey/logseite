@@ -130,7 +130,10 @@
 
 	function generateResultCell($url, $failed) {
 		$color = getColorClass($failed);
-		echo "<td class=".$color."><a href=".$url." style=\"display:block;\">".$failed."</a></td>";
+		// Ajouter ErrorOnly=1 pour filtrer directement les tests en échec
+		$separator = (strpos($url, '?') !== false) ? '&' : '?';
+		$urlWithFilter = $url . $separator . 'ErrorOnly=1';
+		echo "<td class=".$color."><a href=\"".$urlWithFilter."\" style=\"display:block;\">".$failed."</a></td>";
 	}
 	
 	function generateAnalyseCell($url, $analyse) {
@@ -385,18 +388,18 @@
 					if ($row == 3) {
 						//FAILED			
 						echo "<td class=\"tg-casred\" rowspan='1' >Failed</td>";
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_hf&Filter=yes&Testtype=we_hf&Product=weWebSel&tag=", $we_hf_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_rc&Filter=yes&Testtype=we_rc&Product=weWebSel&tag=", $we_rc_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_dev&Filter=yes&Testtype=we_dev&Product=weWebSel&tag=", $we_dev_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_hf&Filter=yes&Testtype=hf_x16&Product=gWWebSel&tag=", $web_hf12_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_rc&Filter=yes&Testtype=rc_x16&Product=gWWebSel&tag=", $web_rc12_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_dev&Filter=yes&Testtype=dev_x16&Product=gWWebSel&tag=", $web_dev12_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_hf&Filter=yes&Testtype=hf_x17&Product=gWWebSel&tag=", $web_hf13_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_rc&Filter=yes&Testtype=rc_x17&Product=gWWebSel&tag=", $web_rc13_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_dev&Filter=yes&Testtype=dev_x17&Product=gWWebSel&tag=", $web_dev13_failed);
-						//generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_hf&Filter=yes&Testtype=hf_x18&Product=gWWebSel&tag=", $web_hf14_failed);
-						//generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_rc&Filter=yes&Testtype=rc_x18&Product=gWWebSel&tag=", $web_rc14_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_dev&Filter=yes&Testtype=dev_x18&Product=gWWebSel&tag=", $web_dev14_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=hf_x17&TestBrowser=chrome", $we_hf_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x17&TestBrowser=chrome", $we_rc_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=dev_x18&TestBrowser=chrome", $we_dev_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x16&TestBrowser=chrome", $web_hf12_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x16&TestBrowser=chrome", $web_rc12_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x16&TestBrowser=chrome", $web_dev12_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x17&TestBrowser=chrome", $web_hf13_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x17&TestBrowser=chrome", $web_rc13_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x17&TestBrowser=chrome", $web_dev13_failed);
+						//generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x18&TestBrowser=chrome", $web_hf14_failed);
+						//generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x18&TestBrowser=chrome", $web_rc14_failed);
+						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x18&TestBrowser=chrome", $web_dev14_failed);
 						/*echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";
@@ -406,18 +409,18 @@
 					if ($row == 4) {
 						//To check
 						echo "<td class=\"tg-warn\" rowspan='1' >To check</td>";
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_hf&Filter=yes&Testtype=we_hf&Product=weWebSel&tag=", $we_hf_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_rc&Filter=yes&Testtype=we_rc&Product=weWebSel&tag=", $we_rc_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_dev&Filter=yes&Testtype=we_dev&Product=weWebSel&tag=", $we_dev_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_hf&Filter=yes&Testtype=hf_x16&Product=gWWebSel&tag=", $web_hf12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_rc&Filter=yes&Testtype=rc_x16&Product=gWWebSel&tag=", $web_rc12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x16_dev&Filter=yes&Testtype=dev_x16&Product=gWWebSel&tag=", $web_dev12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_hf&Filter=yes&Testtype=hf_x17&Product=gWWebSel&tag=", $web_hf13_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_rc&Filter=yes&Testtype=rc_x17&Product=gWWebSel&tag=", $web_rc13_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x17_dev&Filter=yes&Testtype=dev_x17&Product=gWWebSel&tag=", $web_dev13_analyse);
-						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_hf&Filter=yes&Testtype=hf_x18&Product=gWWebSel&tag=", $web_hf14_analyse);
-						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_rc&Filter=yes&Testtype=rc_x18&Product=gWWebSel&tag=", $web_rc14_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=x18_dev&Filter=yes&Testtype=dev_x18&Product=gWWebSel&tag=", $web_dev14_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=hf_x17&TestBrowser=chrome", $we_hf_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x17&TestBrowser=chrome", $we_rc_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=dev_x18&TestBrowser=chrome", $we_dev_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x16&TestBrowser=chrome", $web_hf12_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x16&TestBrowser=chrome", $web_rc12_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x16&TestBrowser=chrome", $web_dev12_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x17&TestBrowser=chrome", $web_hf13_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x17&TestBrowser=chrome", $web_rc13_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x17&TestBrowser=chrome", $web_dev13_analyse);
+						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x18&TestBrowser=chrome", $web_hf14_analyse);
+						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x18&TestBrowser=chrome", $web_rc14_analyse);
+						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x18&TestBrowser=chrome", $web_dev14_analyse);
 						/*echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";
