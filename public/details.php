@@ -187,7 +187,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
 
         <!-- Back button -->
         <div class="btn-back">
-            <a href="index.php?Testtype=<?php echo urlencode($testType); ?>&Product=<?php echo urlencode($product); ?>" 
+            <a href="index.php?Testtype=<?php echo urlencode($testType); ?>&Product=<?php echo urlencode($product); ?>&ErrorOnly=<?php echo $onlyFailed ? '1' : '0'; ?>" 
                class="btn btn-secondary">
                 ← Back to TestSets
             </a>
@@ -267,7 +267,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                             <th style="width: 200px;">Scenario Name</th>
                             <th style="width: 100px;">Tested Build</th>
                             <th style="width: 80px;" class="sortable" data-sort="result">Result <span class="sort-indicator"></span></th>
-                            <th style="width: 70px;">Trigger</th>
+                            <th style="width: 70px;">Run</th>
                             <th style="width: 70px;">Log</th>
                             <th style="width: 80px; text-align: center;">Last Run Date</th>
                             <th style="width: 70px;">Validated</th>
@@ -356,49 +356,45 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     $runningStatus = $scenario['running'] ?? $scenario['Running'] ?? 0;
                                     ?>
                                     <?php if ($runningStatus == 2): ?>
-                                        <!-- Test en cours - image cliquable pour réinitialiser -->
-                                        <img src="running.jpg" 
-                                             alt="Running - Click to reset" 
-                                             title="Click to reset running status"
-                                             class="reset-running-scenario-btn"
+                                        <!-- Test en cours - bouton cliquable pour réinitialiser -->
+                                        <button type="button" 
+                                             class="btn btn-sm btn-warning reset-running-scenario-btn"
+                                             title="Test is running - Click to reset"
                                              onclick="resetScenarioRunning('<?php echo htmlspecialchars($scenario['AutoID']); ?>', '<?php echo htmlspecialchars($testType); ?>', '<?php echo htmlspecialchars($product); ?>', this)"
                                              data-jjob="<?php echo htmlspecialchars($testset['JJob'] ?? 'CI'); ?>"
                                              data-jparam="<?php echo htmlspecialchars($scenario['JParam'] ?? ''); ?>"
                                              data-testtype="<?php echo htmlspecialchars($testType); ?>"
                                              data-product="<?php echo htmlspecialchars($product); ?>"
-                                             data-autoid="<?php echo htmlspecialchars($scenario['AutoID']); ?>"
-                                             style="width:24px;height:24px;border:0;cursor:pointer;">
+                                             data-autoid="<?php echo htmlspecialchars($scenario['AutoID']); ?>">
+                                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running
+                                        </button>
                                     <?php else: ?>
                                         <!-- Test prêt à relancer -->
                                         <a href="<?php echo htmlspecialchars($triggerLink); ?>" 
                                            target="_self" 
-                                           title="Retrigger"
-                                           class="trigger-link"
+                                           title="Run this scenario"
+                                           class="btn btn-sm btn-success trigger-link"
                                            data-jjob="<?php echo htmlspecialchars($testset['JJob'] ?? 'CI'); ?>"
                                            data-jparam="<?php echo htmlspecialchars($scenario['JParam'] ?? ''); ?>"
                                            data-testtype="<?php echo htmlspecialchars($testType); ?>"
                                            data-product="<?php echo htmlspecialchars($product); ?>">
-                                            <img src="clock.png" 
-                                                 alt="Retrigger" 
-                                                 style="width:24px;height:24px;border:0; cursor:pointer;"
-                                                 class="trigger-icon"
-                                                 data-scenario-id="<?php echo htmlspecialchars($scenario['AutoID']); ?>">
+                                            ▶ Run
                                         </a>
                                     <?php endif; ?>
                                 </td>
                                 
                                 <!-- Log -->
-                                <td>
+                                <td class="text-center">
                                     <?php 
                                     $logLink = $scenario['LogLink'] ?? null;
                                     
                                     if (!empty($logLink)) {
-                                        echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-outline-info" title="View log">';
+                                        echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-info" title="View Allure report">';
                                         echo '📋 Log';
                                         echo '</a>';
                                     } else {
-                                        echo '<button class="btn btn-sm btn-outline-info" disabled title="No log available">';
-                                        echo '📋';
+                                        echo '<button type="button" class="btn btn-sm btn-secondary" disabled title="No log available">';
+                                        echo '📋 N/A';
                                         echo '</button>';
                                     }
                                     ?>
@@ -520,34 +516,26 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 });
             }
             
-            // Gérer le clic sur les liens Trigger pour mettre à jour l'icône en running
+            // Gérer le clic sur les boutons Run pour les transformer en "Running"
             document.querySelectorAll('.trigger-link').forEach(link => {
                 link.addEventListener('click', function(e) {
-                    // Ne pas empêcher la navigation, juste mettre à jour l'icône
-                    const img = this.querySelector('.trigger-icon');
-                    if (img) {
-                        // Changer l'icône en running
-                        img.src = 'running.jpg';
-                        img.alt = 'Running';
-                        img.title = 'Test is running';
-                        
-                        // Feedback visuel - flash
-                        img.style.opacity = '0.6';
-                        setTimeout(() => {
-                            img.style.opacity = '1';
-                            img.style.transition = 'opacity 0.3s ease';
-                        }, 100);
-                    }
+                    // Ne pas empêcher la navigation, juste transformer le bouton
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-warning');
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
+                    this.title = 'Test is running';
+                    this.style.pointerEvents = 'none';
                 });
             });
         });
         
-        // Gérer le clic sur l'image "running" - fonction globale appelée par onclick inline
-        function resetScenarioRunning(autoID, testType, product, imgElement) {
+        // Gérer le clic sur le bouton "Running" - fonction globale appelée par onclick inline
+        function resetScenarioRunning(autoID, testType, product, btnElement) {
             console.log('resetScenarioRunning called - AutoID:', autoID, 'TestType:', testType, 'Product:', product);
             
             // Feedback visuel
-            imgElement.style.opacity = '0.5';
+            btnElement.style.opacity = '0.5';
+            btnElement.style.pointerEvents = 'none';
             
             // Appeler check.php pour remettre running=0
             const url = 'check.php?value=0&field=running' + 
@@ -566,22 +554,20 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 .then(data => {
                     console.log('Response data:', data);
                     if (data.success) {
-                        imgElement.style.opacity = '1';
-                        imgElement.style.filter = 'brightness(0.8)';
+                        btnElement.style.opacity = '1';
                         setTimeout(() => {
-                            imgElement.style.filter = 'brightness(1)';
-                            setTimeout(() => {
-                                location.reload();
-                            }, 300);
+                            location.reload();
                         }, 300);
                     } else {
-                        imgElement.style.opacity = '1';
+                        btnElement.style.opacity = '1';
+                        btnElement.style.pointerEvents = 'auto';
                         alert('Error: ' + data.message);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    imgElement.style.opacity = '1';
+                    btnElement.style.opacity = '1';
+                    btnElement.style.pointerEvents = 'auto';
                     alert('Error resetting running status: ' + error.message);
                 });
         }

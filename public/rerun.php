@@ -106,13 +106,13 @@ if ($Product == "weWebSel") {
 }
 
 // Construire l'URL de vérification du test
-// check.php résout la table via Testtype + Product (gère SmartWe → we_rc, we_hf, etc.)
-// check.php est maintenant en local dans public/
+// check.php résout la table via Testtype + Product (gère SmartWe → we_rc)
+// check.php est en local dans logg/public/
 $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$host = $_SERVER['HTTP_HOST'] ?? 'sqs-sel-cent1.cas-software.dev';
 $basePath = dirname($_SERVER['PHP_SELF'] ?? '/logg/public/rerun.php');
-$runn = $protocol . "://" . $host . $basePath . "/check.php?value=2" . 
-        "&autoid=" . urlencode($AutoID) . 
+$runn = $protocol . "://" . $host . $basePath . "/check.php?value=2" .
+        "&autoid=" . urlencode($AutoID) .
         "&LogVersion=" . urlencode($LogVersion) .
         "&Testtype=" . urlencode($Testtype) .
         "&Product=" . urlencode($Product);
@@ -141,7 +141,7 @@ if ($execute) {
         }
         
 		ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug, 
-                     $localrun, $parallel, $Build, $retry, $Product);
+                     $localrun, $parallel, $Build, $retry);
     } elseif (isset($_GET['Abort'])) {
         header("Location: " . $logurl);
         exit;
@@ -526,53 +526,25 @@ if ($execute) {
 /**
  * Confirmer et lancer le test
  */
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $Product = '') {
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry) {
     $Test_y = "&Test_Node=" . $Test_x;
     
-    // Détecter SmartWe
-    $isSmartWe = (strpos($Product, 'weWebSel') !== false || 
-                  strpos($Product, 'weClient') !== false || 
-                  strpos($Product, 'smartWe') !== false || 
-                  strpos($Product, 'SmartWe') !== false);
-    
     // Mapper les branches
-    if ($isSmartWe) {
-        // Pour SmartWe : dev → dev/14.x, rc → rc/13.x, hf → hotfix/13.x
-        $branchMap = [
-            'dev_x14' => 'dev/14.x',
-            'dev_x15' => 'dev/14.x',
-            'dev_x16' => 'dev/14.x',
-            'dev_x17' => 'dev/14.x',
-            'dev_x18' => 'dev/14.x',
-            'rc_x14'  => 'rc/13.x',
-            'rc_x15'  => 'rc/13.x',
-            'rc_x16'  => 'rc/13.x',
-            'rc_x17'  => 'rc/13.x',
-            'rc_x18'  => 'rc/13.x',
-            'hf_x14'  => 'hotfix/13.x',
-            'hf_x15'  => 'hotfix/13.x',
-            'hf_x16'  => 'hotfix/13.x',
-            'hf_x17'  => 'hotfix/13.x',
-            'hf_x18'  => 'hotfix/13.x',
-            'we_dev'  => 'dev/14.x',
-            'we_rc'   => 'rc/13.x',
-            'we_hf'   => 'hotfix/13.x',
-        ];
-    } else {
-        // Pour gWWebSel et autres
-        $branchMap = [
-            'hf_x15' => 'hotfix/11.x',
-            'dev_x16' => 'dev/12.x',
-            'rc_x16' => 'rc/12.x',
-            'hf_x16' => 'hotfix/12.x',
-            'dev_x17' => 'dev/13.x',
-            'rc_x17' => 'rc/13.x',
-            'hf_x17' => 'hotfix/13.x',
-            'dev_x18' => 'dev/14.x',
-            'rc_x18' => 'rc/14.x',
-            'hf_x18' => 'hotfix/14.x',
-        ];
-    }
+    $branchMap = [
+        'hf_x15' => 'hotfix/11.x',
+        'dev_x16' => 'dev/12.x',
+        'rc_x16' => 'rc/12.x',
+        'hf_x16' => 'hotfix/12.x',
+        'dev_x17' => 'dev/13.x',
+        'rc_x17' => 'rc/13.x',
+        'hf_x17' => 'hotfix/13.x',
+        'dev_x18' => 'dev/14.x',
+        'rc_x18' => 'rc/14.x',
+        'hf_x18' => 'hotfix/14.x',
+        'we_dev' => 'dev/14.x',
+        'we_rc' => 'rc/13.x',
+        'we_hf' => 'hotfix/13.x',
+    ];
     
     $branch = $branchMap[$branch] ?? $branch;
     
@@ -589,7 +561,7 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     }
     
     // Sélectionner le hub
-    if ($Test_x !== "JDF" && $Test_x !== "SV" && $Test_x !== "OG" && $Test_x !== "AS") {
+    if ($Test_x !== "JDF" && $Test_x !== "SV" && $Test_x !== "OG" && $Test_x !== "AS" && $Test_x !== "Grid") {
         $Hub = "http://sqs-gridhub1";
     } else {
         $Hub = "https://sqs-sel-cent1.cas-software.dev";
@@ -612,30 +584,30 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
         $test = $test . "&RETRY_FAILED=true";
     }
     
-    // Envoyer les requêtes via GET (Jenkins utilise les URL parameters)
+    // Envoyer les requêtes via POST (Jenkins nécessite POST, pas GET)
     
-    // Fonction pour envoyer une requête GET
-    function sendGetRequest($url) {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 10,
-                'ignore_errors' => true
-            ],
-            'ssl' => [
-                'verify_peer' => false,
-                'verify_peer_name' => false
-            ]
-        ]);
+    // Fonction pour envoyer une requête POST
+    function sendPostRequest($url) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         
-        $response = @file_get_contents($url, false, $context);
-        return ['response' => $response];
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return ['code' => $httpCode, 'response' => $response];
     }
     
     // Envoyer la requête de vérification
-    @sendGetRequest($runn);
+    @sendPostRequest($runn);
+    
     // Envoyer la requête de test à Jenkins
-    @sendGetRequest($test);
+    @sendPostRequest($test);
     
     // Rediriger vers le log
     header("Location: " . $logurl);

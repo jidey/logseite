@@ -36,20 +36,28 @@ $cacheStats = $repo->getCacheStats();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cache Management</title>
+    <!-- Theme init (avant CSS pour éviter le flash) -->
+    <script src="js/theme.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/theme.css" rel="stylesheet">
     <style>
         body { padding: 20px; }
         .stat-box { 
-            background: #f8f9fa; 
+            background: var(--bg-tertiary); 
             padding: 15px; 
             border-radius: 5px; 
             margin: 10px 0;
             border-left: 4px solid #007bff;
+            color: var(--text-primary);
         }
-        .stat-box strong { font-size: 1.3em; color: #007bff; }
+        .stat-box strong { font-size: 1.3em; color: var(--link-color); }
     </style>
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button id="themeToggle" class="btn btn-sm btn-outline-secondary theme-toggle-btn" title="Toggle Dark/Light Mode" onclick="toggleTheme()">
+        🌙 Dark
+    </button>
     <div class="container">
         <h1>⚙️ Cache Management</h1>
         <p class="text-muted">Manage and monitor the system cache</p>

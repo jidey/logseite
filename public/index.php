@@ -250,6 +250,30 @@ foreach ($versions as $v) {
 // Get test types for current product (based on actual data)
 $testTypesForProduct = $repo->getAvailableTestTypesForProduct($product);
 
+// Détecter gW Desktop (gWClient)
+$isGwDesktop = (strpos($product, 'gWClient') !== false);
+
+// Pour gW Desktop, forcer la liste de branches spécifique
+if ($isGwDesktop) {
+    // Afficher toutes ces branches, qu'elles aient des données ou non
+    $testTypesForProduct = ['hf_x15', 'dev_x16', 'rc_x16', 'hf_x16', 'rc_x17', 'hf_x17'];
+} else {
+    // Pour les autres produits (gW Web, etc.), exclure les branches obsolètes
+    $excludedBranches = ['dev_x15'];  // Versions plus disponibles
+    $testTypesForProduct = array_values(array_filter($testTypesForProduct, function($tt) use ($excludedBranches) {
+        return !in_array($tt, $excludedBranches);
+    }));
+    
+    // Ajouter les branches futures (pas encore disponibles) si absentes
+    // Elles seront affichées entre parenthèses dans le select
+    $futureBranches = ['rc_x18', 'hf_x18'];
+    foreach ($futureBranches as $fb) {
+        if (!in_array($fb, $testTypesForProduct)) {
+            $testTypesForProduct[] = $fb;
+        }
+    }
+}
+
 // Pour SmartWe, créer un mapping label simplifié → testType réel
 // ($isSmartWe et la normalisation de $testType sont déjà faits plus haut)
 if ($isSmartWe) {
@@ -314,6 +338,56 @@ if (empty($testTypesForProduct)) {
             
             // Stocker le thème appliqué pour utilisation après le chargement du DOM
             window.initialTheme = appliedTheme;
+        })();
+    </script>
+    
+    <!-- Early Filters Redirect: applique TOUS les filtres du cache AVANT le rendu -->
+    <!-- Priorité : charger directement les données filtrées selon les préférences sauvegardées -->
+    <script>
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Détecter si c'est un "premier chargement" (aucun filtre dans l'URL)
+            // On considère que si Product n'est pas dans l'URL, l'utilisateur arrive "à neuf"
+            const hasAnyFilter = urlParams.has('Product') || urlParams.has('Testtype') || 
+                                 urlParams.has('TeamTag') || urlParams.has('ErrorOnly');
+            
+            if (!hasAnyFilter) {
+                // Charger les préférences depuis le cache unifié
+                let prefs = {};
+                try {
+                    const cached = localStorage.getItem('logg-prefs');
+                    if (cached) prefs = JSON.parse(cached);
+                } catch (e) {}
+                
+                let needsRedirect = false;
+                
+                // Product
+                if (prefs.product) {
+                    urlParams.set('Product', prefs.product);
+                    needsRedirect = true;
+                }
+                // Branch (Testtype)
+                if (prefs.testtype) {
+                    urlParams.set('Testtype', prefs.testtype);
+                    needsRedirect = true;
+                }
+                // Team
+                if (prefs.team_tag) {
+                    urlParams.set('TeamTag', prefs.team_tag);
+                    needsRedirect = true;
+                }
+                // Error Only
+                if (prefs.error_only === 1 || prefs.error_only === '1') {
+                    urlParams.set('ErrorOnly', '1');
+                    needsRedirect = true;
+                }
+                
+                // Rediriger une seule fois avec tous les filtres
+                if (needsRedirect) {
+                    window.location.replace(window.location.pathname + '?' + urlParams.toString());
+                }
+            }
         })();
     </script>
     
@@ -384,7 +458,7 @@ if (empty($testTypesForProduct)) {
                     <!-- Product FIRST -->
                     <div>
                         <label for="product" class="form-label"><strong>Product</strong></label>
-                        <select class="form-select" id="product" name="Product" onchange="this.form.submit()" style="width: 100%;">
+                        <select class="form-select" id="product" name="Product" style="width: 100%;">
                             <?php 
                             // Mapping des noms affichés pour les produits
                             $productMapping = [
@@ -407,7 +481,7 @@ if (empty($testTypesForProduct)) {
                     <!-- Branch SECOND -->
                     <div>
                         <label for="testtype" class="form-label"><strong>Branch</strong></label>
-                        <select class="form-select" id="testtype" name="Testtype" onchange="this.form.submit()" style="width: 100%;">
+                        <select class="form-select" id="testtype" name="Testtype" style="width: 100%;">
                             <?php if ($isSmartWe && !empty($smartWeMapping)): ?>
                                 <?php foreach ($smartWeMapping as $label => $realType): ?>
                                     <option value="<?php echo htmlspecialchars($realType); ?>" 
@@ -416,29 +490,29 @@ if (empty($testTypesForProduct)) {
                                     </option>
                                 <?php endforeach; ?>
                             <?php else: ?>
-                                <?php foreach ($testTypesForProduct as $v): ?>
+                                <?php 
+                                // Branches pas encore disponibles : affichées entre parenthèses
+                                $notYetAvailable = ['rc_x18', 'hf_x18'];
+                                foreach ($testTypesForProduct as $v): 
+                                    // Label avec parenthèses si la branche n'existe pas encore
+                                    $displayLabel = in_array($v, $notYetAvailable) ? "($v)" : $v;
+                                ?>
                                     <option value="<?php echo htmlspecialchars($v); ?>" 
                                         <?php echo $testType === $v ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($v); ?>
+                                        <?php echo htmlspecialchars($displayLabel); ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </select>
                     </div>
 
-                    <!-- Browser -->
-                    <div>
-                        <label for="browser" class="form-label"><strong>Browser</strong></label>
-                        <select class="form-select" id="browser" name="TestBrowser" onchange="this.form.submit()" style="width: 100%;">
-                            <option value="chrome" <?php echo $browser === 'chrome' ? 'selected' : ''; ?>>Chrome</option>
-                            <option value="firefox" <?php echo $browser === 'firefox' ? 'selected' : ''; ?>>Firefox</option>
-                        </select>
-                    </div>
+                    <!-- Browser (caché - toujours chrome par défaut) -->
+                    <input type="hidden" name="TestBrowser" value="chrome">
 
                     <!-- Team Filter -->
                     <div>
                         <label for="teamtag" class="form-label"><strong>Team</strong></label>
-                        <select class="form-select" id="teamtag" name="TeamTag" onchange="this.form.submit()" style="width: 100%;">
+                        <select class="form-select" id="teamtag" name="TeamTag" style="width: 100%;">
                             <option value="">All Teams</option>
                             <?php foreach ($uniqueTeamTags as $tag): ?>
                                 <option value="<?php echo htmlspecialchars($tag); ?>" <?php echo $teamTag === $tag ? 'selected' : ''; ?>>
@@ -470,13 +544,13 @@ if (empty($testTypesForProduct)) {
                 <div class="filter-group">
                     <div class="btn-group w-100" role="group">
                         <input type="radio" class="btn-check" name="ErrorOnly" id="errorsOffBtn" value="0" 
-                               <?php echo !$errorOnly ? 'checked' : ''; ?> onchange="this.form.submit()">
+                               <?php echo !$errorOnly ? 'checked' : ''; ?>>
                         <label class="btn btn-outline-primary" for="errorsOffBtn">
                             All Results
                         </label>
                         
                         <input type="radio" class="btn-check" name="ErrorOnly" id="errorsOnBtn" value="1" 
-                               <?php echo $errorOnly ? 'checked' : ''; ?> onchange="this.form.submit()">
+                               <?php echo $errorOnly ? 'checked' : ''; ?>>
                         <label class="btn btn-outline-danger" for="errorsOnBtn">
                             ❌ Errors Only
                         </label>
@@ -524,7 +598,7 @@ if (empty($testTypesForProduct)) {
                             <th style="width: 70px; text-align: center;">Log</th>
                             <th style="width: 60px; text-align: center;">Run</th>
                             <th style="width: 55px; text-align: center;">Duration</th>
-                            <th style="width: 80px; text-align: center;" class="sortable" data-sort="date">Date <span class="sort-indicator"></span></th>
+                            <th style="width: 80px; text-align: center;" class="sortable desc-active" data-sort="date" data-default-sort="desc">Date <span class="sort-indicator desc"></span></th>
                             <th style="width: 280px; text-align: center;" class="sortable" data-sort="notes">Notes <span class="sort-indicator"></span></th>
                             <th style="width: 80px; text-align: center;" class="sortable" data-sort="team">Team <span class="sort-indicator"></span></th>
                         </tr>
@@ -594,26 +668,26 @@ if (empty($testTypesForProduct)) {
                                     <?php echo $testset['TearDownFailed'] ?? 0; ?>
                                 </td>
                                 
-                                <!-- Details -->
+                                <!-- Testcases (Details) -->
                                 <td align='center'>
                                     <a href="details.php?Testtype=<?php echo urlencode($testType); ?>&Product=<?php echo urlencode($product); ?>&AutoID=<?php echo urlencode($testset['AutoID']); ?>&OnlyFailed=<?php echo $errorOnly ? '1' : '0'; ?>" 
-                                       class="btn btn-sm btn-outline-primary" title="View Testcases details">
+                                       class="btn btn-sm btn-primary" title="View Testcases details">
                                         🔍 Details
                                     </a>
                                 </td>
                                 
 								<!-- Log -->
-                                <td>
+                                <td class="text-center">
                                     <?php 
                                     $logLink = $testset['LogLink'] ?? null;
                                     
                                     if (!empty($logLink)) {
-                                        echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-outline-info" title="View log">';
+                                        echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-info" title="View Allure report">';
                                         echo '📋 Allure';
                                         echo '</a>';
                                     } else {
-                                        echo '<button class="btn btn-sm btn-outline-info" disabled title="No log available">';
-                                        echo '📋';
+                                        echo '<button type="button" class="btn btn-sm btn-secondary" disabled title="No log available">';
+                                        echo '📋 N/A';
                                         echo '</button>';
                                     }
                                     ?>
@@ -643,22 +717,26 @@ if (empty($testTypesForProduct)) {
                                     
                                     $runningStatus = $testset['running'] ?? $testset['Running'] ?? 0;
                                     if ($runningStatus == 2) {
-                                        // Image cliquable pour réinitialiser le statut "running"
-                                        echo '<img src="running.jpg" alt="Running - Click to reset" ' .
-                                             'style="width:24px;height:24px;border:0;cursor:pointer;" ' .
-                                             'class="reset-running-btn" ' .
+                                        // Bouton "Running" cliquable pour réinitialiser le statut
+                                        echo '<button type="button" class="btn btn-sm btn-warning reset-running-btn" ' .
                                              'data-jjob="' . htmlspecialchars($testset['JJob']) . '" ' .
                                              'data-jparam="' . htmlspecialchars($testset['JParam']) . '" ' .
                                              'data-testtype="' . htmlspecialchars($testType) . '" ' .
                                              'data-product="' . htmlspecialchars($product) . '" ' .
-                                             'title="Click to reset running status">';
+                                             'data-autoid="' . htmlspecialchars($testset['AutoID']) . '" ' .
+                                             'title="Test is running - Click to reset">';
+                                        echo '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
+                                        echo '</button>';
                                     } else {
-                                        echo '<a href="' . htmlspecialchars($runLink) . '" target="_self" class="run-link" ' .
+                                        // Bouton "Run" pour lancer le test
+                                        echo '<a href="' . htmlspecialchars($runLink) . '" target="_self" ' .
+                                             'class="btn btn-sm btn-success run-link" ' .
                                              'data-jjob="' . htmlspecialchars($testset['JJob']) . '" ' .
                                              'data-jparam="' . htmlspecialchars($testset['JParam']) . '" ' .
                                              'data-testtype="' . htmlspecialchars($testType) . '" ' .
-                                             'data-product="' . htmlspecialchars($product) . '">';
-                                        echo '<img src="clock.png" alt="" style="width:24px;height:24px;border:0; cursor:pointer;" class="run-icon">';
+                                             'data-product="' . htmlspecialchars($product) . '" ' .
+                                             'title="Run this TestSet">';
+                                        echo '▶ Run';
                                         echo '</a>';
                                     }
                                     ?>
@@ -690,7 +768,7 @@ if (empty($testTypesForProduct)) {
                                 </td>
                                 
                                 <!-- Date -->
-                                <td>
+                                <td data-sort-value="<?php echo !empty($testset['RunDate']) ? strtotime($testset['RunDate']) : 0; ?>">
                                     <small>
                                         <?php 
                                         if (!empty($testset['RunDate'])) {
@@ -824,22 +902,23 @@ if (empty($testTypesForProduct)) {
             
             updateThemeButton();
             
-            // Restaurer la préférence "All Results / Errors Only" depuis localStorage
-            const savedErrorOnly = localStorage.getItem('logg-error-only');
-            if (savedErrorOnly !== null) {
-                const errorOnlyBtn = document.getElementById(savedErrorOnly === '1' ? 'errorsOnBtn' : 'errorsOffBtn');
-                if (errorOnlyBtn) {
-                    const isCurrentlyChecked = errorOnlyBtn.checked;
-                    errorOnlyBtn.checked = true;
-                    
-                    // Si la valeur sauvegardée est différente de celle actuellement cochée, soumettre le formulaire
-                    if (!isCurrentlyChecked) {
-                        errorOnlyBtn.form.submit();
-                    }
-                }
-            }
+            // ════════════════════════════════════════════════════════════
+            // GESTION CENTRALISÉE DES FILTRES
+            // Chaque changement : 1) sauvegarde le cache  2) soumet le formulaire
+            // ════════════════════════════════════════════════════════════
             
-            // Sauvegarder le choix dans localStorage quand on change
+            // Filtres qui déclenchent une soumission (rechargement avec nouvelles données)
+            ['product', 'testtype', 'teamtag'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('change', function() {
+                        savePreferences();       // Sauvegarder AVANT
+                        this.form.submit();      // Puis soumettre
+                    });
+                }
+            });
+            
+            // Boutons radio ErrorOnly
             const errorsOffBtn = document.getElementById('errorsOffBtn');
             const errorsOnBtn = document.getElementById('errorsOnBtn');
             
@@ -847,6 +926,8 @@ if (empty($testTypesForProduct)) {
                 errorsOffBtn.addEventListener('change', function() {
                     if (this.checked) {
                         localStorage.setItem('logg-error-only', '0');
+                        savePreferences();
+                        this.form.submit();
                     }
                 });
             }
@@ -855,10 +936,19 @@ if (empty($testTypesForProduct)) {
                 errorsOnBtn.addEventListener('change', function() {
                     if (this.checked) {
                         localStorage.setItem('logg-error-only', '1');
+                        savePreferences();
+                        this.form.submit();
                     }
                 });
             }
-        });
+            
+            // Champ de recherche TestSet : sauvegarder à chaque frappe (sans soumettre)
+            const testsetInput = document.getElementById('testsetFilter');
+            if (testsetInput) {
+                testsetInput.addEventListener('input', function() {
+                    savePreferences();
+                });
+            }
             
             // Gérer le bouton de suppression du filtre Testset Name
             const clearBtn = document.getElementById('clearTestsetFilter');
@@ -867,9 +957,11 @@ if (empty($testTypesForProduct)) {
                     e.preventDefault();
                     const testsetInput = document.getElementById('testsetFilter');
                     testsetInput.value = '';
+                    savePreferences();
                     testsetInput.form.submit();
                 });
             }
+        });
 
         function updateThemeButton() {
             const themeToggle = document.getElementById('themeToggle');
@@ -998,13 +1090,14 @@ if (empty($testTypesForProduct)) {
         
         // Save preferences to local cache
         function savePreferences() {
+            const browserEl = document.getElementById('browser');
             const prefs = {
                 theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
                 text_size: parseInt(textSizeSlider.value),
                 error_only: document.getElementById('errorsOnBtn').checked ? 1 : 0,
                 product: document.getElementById('product').value,
                 testtype: document.getElementById('testtype').value,
-                test_browser: document.getElementById('browser').value,
+                test_browser: browserEl ? browserEl.value : 'chrome',
                 team_tag: document.getElementById('teamtag').value
             };
             
@@ -1014,11 +1107,11 @@ if (empty($testTypesForProduct)) {
         // Load preferences on page load
         loadUserPreferences();
         
-        // Save preferences on form submit
+        // Sécurité : sauvegarder aussi au submit du formulaire (synchrone)
         const filterForm = document.querySelector('form');
         if (filterForm) {
             filterForm.addEventListener('submit', function() {
-                setTimeout(savePreferences, 100);
+                savePreferences();
             });
         }
         
@@ -1032,61 +1125,54 @@ if (empty($testTypesForProduct)) {
                 const jParam = this.dataset.jparam;
                 const testType = this.dataset.testtype;
                 const product = this.dataset.product;
-                const imgElement = this;
+                const btnElement = this;
                 
-                // Feedback visuel - changement temporaire de couleur
-                imgElement.style.opacity = '0.5';
+                // Feedback visuel
+                btnElement.style.opacity = '0.5';
+                btnElement.style.pointerEvents = 'none';
                 
-                // Appel AJAX pour réinitialiser le statut
-                fetch('reset_running.php?JJob=' + encodeURIComponent(jJob) + 
-                      '&JParam=' + encodeURIComponent(jParam) + 
+                // Appel direct à check.php pour réinitialiser le statut (running=0)
+                fetch('check.php?value=0&field=running' +
+                      '&autoid=' + encodeURIComponent(this.dataset.autoid || '') +
+                      '&LogVersion=' + encodeURIComponent(testType) +
                       '&Testtype=' + encodeURIComponent(testType) + 
-                      '&Product=' + encodeURIComponent(product))
+                      '&Product=' + encodeURIComponent(product) +
+                      '&JJob=' + encodeURIComponent(jJob) +
+                      '&JParam=' + encodeURIComponent(jParam))
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Feedback: flash vert
-                            imgElement.style.opacity = '1';
-                            imgElement.style.filter = 'brightness(0.8)';
+                            // Feedback puis rafraîchir
+                            btnElement.style.opacity = '1';
                             setTimeout(() => {
-                                imgElement.style.filter = 'brightness(1)';
-                                // Rafraîchir la page après 300ms
-                                setTimeout(() => {
-                                    location.reload();
-                                }, 300);
+                                location.reload();
                             }, 300);
                         } else {
-                            imgElement.style.opacity = '1';
+                            btnElement.style.opacity = '1';
+                            btnElement.style.pointerEvents = 'auto';
                             alert('Error: ' + data.message);
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        imgElement.style.opacity = '1';
+                        btnElement.style.opacity = '1';
+                        btnElement.style.pointerEvents = 'auto';
                         alert('Error resetting running status');
                     });
             });
         });
         
-        // Gérer le clic sur les liens Run pour mettre à jour l'icône en running
+        // Gérer le clic sur les boutons Run pour les transformer en "Running"
         // Note: check.php (appelé par rerun.php via $runn) met running=2 côté serveur
         document.querySelectorAll('.run-link').forEach(link => {
             link.addEventListener('click', function(e) {
-                // Ne pas empêcher la navigation, juste mettre à jour l'icône
-                const img = this.querySelector('.run-icon');
-                if (img) {
-                    // Changer l'icône en running
-                    img.src = 'running.jpg';
-                    img.alt = 'Running';
-                    img.title = 'Test is running';
-                    
-                    // Feedback visuel - flash
-                    img.style.opacity = '0.6';
-                    setTimeout(() => {
-                        img.style.opacity = '1';
-                        img.style.transition = 'opacity 0.3s ease';
-                    }, 100);
-                }
+                // Ne pas empêcher la navigation, juste transformer le bouton
+                // Transformer le bouton "Run" en "Running"
+                this.classList.remove('btn-success');
+                this.classList.add('btn-warning');
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
+                this.title = 'Test is running';
+                this.style.pointerEvents = 'none'; // Éviter double-clic
             });
         });
         

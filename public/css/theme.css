@@ -1,0 +1,287 @@
+/**
+ * THEME.CSS - Système de thème Dark/Light partagé
+ * À inclure dans toutes les pages LOGG (dash, vm_config, cache_management, etc.)
+ */
+
+:root {
+    --bg-primary: #f8f9fa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f5f5f5;
+    --text-primary: #212529;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --border-color: #dee2e6;
+    --border-light: rgba(0,0,0,.08);
+    --input-bg: #ffffff;
+    --input-border: #dee2e6;
+    --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --link-color: #007bff;
+}
+
+body.dark-mode {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #3a3a3a;
+    --text-primary: #e4e4e4;
+    --text-secondary: #b0b0b0;
+    --text-muted: #808080;
+    --border-color: #444444;
+    --border-light: rgba(255,255,255,.1);
+    --input-bg: #3a3a3a;
+    --input-border: #555555;
+    --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    --link-color: #4a9eff;
+}
+
+body {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Containers et cartes */
+.container, .container-fluid, .card {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.card {
+    border-color: var(--border-color) !important;
+    box-shadow: var(--card-shadow);
+}
+
+.card-header, .card-body, .card-footer {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Titres */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary) !important;
+}
+
+/* Tableaux */
+.table {
+    color: var(--text-primary) !important;
+}
+
+.table td, .table th {
+    border-color: var(--border-color) !important;
+}
+
+body.dark-mode .table {
+    --bs-table-bg: transparent;
+}
+
+body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255,255,255,.03);
+}
+
+/* Formulaires */
+.form-control, .form-select, select, input, textarea {
+    background: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--input-border) !important;
+}
+
+.form-control:focus, .form-select:focus {
+    background: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Liens */
+a {
+    color: var(--link-color);
+}
+
+/* Texte secondaire */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Bouton theme toggle */
+.theme-toggle-btn {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    z-index: 9999;
+}
+
+/* Boutons outline en dark mode */
+body.dark-mode .btn-outline-secondary {
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .btn-outline-secondary:hover {
+    background: var(--bg-tertiary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASH.PHP - Table .tg : forcer texte lisible sur fonds colorés
+   (les cellules colorées gardent leur fond, mais texte foncé)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Cellules de statut colorées : texte foncé lisible (light + dark) */
+.tg .testfail,
+.tg .testwarn,
+.tg .testok,
+.tg .tg-green,
+.tg .tg-red,
+.tg .tg-warn,
+.tg .tg-green a,
+.tg .tg-red a,
+.tg .tg-warn a,
+.tg .testfail a,
+.tg .testwarn a,
+.tg .testok a {
+    color: #1a1a1a !important;  /* Texte foncé sur fonds clairs colorés */
+}
+
+.tg .tg-casred,
+.tg .tg-casred a {
+    color: #ffffff !important;  /* Sauf casred (fond rouge foncé) → texte blanc */
+}
+
+/* En-têtes et cellules simples : suivre le thème */
+.tg .tg-simple,
+.tg .tg-simple1 {
+    color: var(--text-primary) !important;
+}
+
+body.dark-mode .tg .tg-simple1 {
+    color: var(--text-secondary) !important;
+}
+
+/* Bordures du tableau en dark mode : plus claires pour rester visibles */
+body.dark-mode .tg td,
+body.dark-mode .tg th {
+    border-color: #666 !important;
+}
+
+/* Cellules sans classe spéciale en dark mode */
+body.dark-mode .tg th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary) !important;
+}
+
+/* Cellule "disabled" (gris) en dark mode */
+.tg .tg-disabled,
+.tg .tg-disabled a {
+    color: #cccccc !important;
+}
+
+/* Lien "Reload" et "UI-TESTS STATUS Summary" en dark mode */
+body.dark-mode center a,
+body.dark-mode .reload a {
+    color: var(--link-color) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   VM_CONFIG.PHP - Améliorer lisibilité des en-têtes et lignes
+   ═══════════════════════════════════════════════════════════════ */
+
+/* En-têtes table-light : adapter au dark mode */
+body.dark-mode .table-light,
+body.dark-mode .table-light > th,
+body.dark-mode .table-light > td,
+body.dark-mode thead.table-light th {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: #666 !important;
+}
+
+/* Liens dans les en-têtes (x16dev, x17rc, etc.) plus visibles */
+body.dark-mode .table-light th a,
+body.dark-mode .table th a {
+    color: #5aa9ff !important;
+    font-weight: bold;
+}
+
+/* Cellules vertes (bg-success) : garder vert mais texte foncé lisible */
+.table .bg-success,
+body.dark-mode .table .bg-success {
+    background-color: #2e7d32 !important;  /* Vert plus foncé */
+    color: #ffffff !important;
+}
+
+/* Cellules orange (bg-warning) : texte foncé lisible */
+.table .bg-warning,
+body.dark-mode .table .bg-warning {
+    background-color: #f0ad4e !important;
+    color: #1a1a1a !important;
+}
+
+/* Lignes "Last Build" et cellules normales en dark mode */
+body.dark-mode .table th,
+body.dark-mode .table td {
+    color: var(--text-primary);
+    border-color: #555 !important;
+}
+
+/* Cellule th "Last Build", "Deployed on VM", etc. (1ère colonne) */
+body.dark-mode .table tbody th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary) !important;
+}
+
+/* Onglets (nav-tabs) en dark mode */
+body.dark-mode .nav-tabs .nav-link {
+    color: var(--text-secondary);
+}
+
+body.dark-mode .nav-tabs .nav-link.active {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: #666 #666 var(--bg-secondary);
+}
+
+body.dark-mode .nav-tabs {
+    border-bottom-color: #666;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHECKBOXES - Bien visibles dans les deux états (dark + light)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Checkbox plus grande pour meilleure visibilité */
+.form-check-input[type="checkbox"] {
+    width: 1.3em;
+    height: 1.3em;
+    cursor: pointer;
+}
+
+/* État NON coché : bordure visible et fond contrasté */
+body.dark-mode .form-check-input {
+    background-color: #2d2d2d;
+    border: 2px solid #888 !important;
+}
+
+body.dark-mode .form-check-input:not(:checked) {
+    background-color: #1a1a1a;
+    border-color: #999 !important;
+}
+
+/* État COCHÉ : vert vif bien visible */
+.form-check-input:checked {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+}
+
+body.dark-mode .form-check-input:checked {
+    background-color: #2ecc71 !important;
+    border-color: #2ecc71 !important;
+}
+
+/* Focus : halo visible */
+.form-check-input:focus {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.25rem rgba(40,167,69,.35) !important;
+}
+
+/* Hover sur la checkbox */
+.form-check-input:hover {
+    border-color: #28a745 !important;
+}

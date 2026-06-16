@@ -100,7 +100,48 @@ function sortTable(header) {
         tbody.appendChild(row);
     });
     
+    // Sauvegarder la préférence de tri dans le cache
+    try {
+        localStorage.setItem('logg-sort', JSON.stringify({
+            column: sortColumn,
+            order: isAsc ? 'asc' : 'desc'
+        }));
+    } catch (e) {}
+    
     console.log('✅ Table sorted:', sortColumn, isAsc ? 'ASC' : 'DESC');
+}
+
+/**
+ * Appliquer le tri sauvegardé depuis le cache au chargement
+ */
+function applySavedSort() {
+    let savedSort = null;
+    try {
+        const cached = localStorage.getItem('logg-sort');
+        if (cached) savedSort = JSON.parse(cached);
+    } catch (e) {}
+    
+    if (!savedSort || !savedSort.column) return;
+    
+    // Trouver l'en-tête correspondant
+    const header = document.querySelector('th.sortable[data-sort="' + savedSort.column + '"]');
+    if (!header) return;
+    
+    // Si le tri sauvegardé correspond déjà au tri par défaut (date desc), ne rien faire
+    const isDefaultDateDesc = (savedSort.column === 'date' && savedSort.order === 'desc');
+    if (isDefaultDateDesc) return;
+    
+    // Appliquer le tri : on simule un clic, mais on doit gérer l'ordre
+    // sortTable inverse l'ordre actuel, donc on prépare l'état pour obtenir le bon ordre
+    if (savedSort.order === 'desc') {
+        // Pour obtenir desc, header ne doit PAS avoir asc-active (sortTable mettra desc)
+        header.classList.remove('asc-active');
+        header.classList.add('asc-active'); // sera inversé en desc
+    } else {
+        // Pour obtenir asc, header doit avoir desc-active ou rien
+        header.classList.remove('asc-active');
+    }
+    sortTable(header);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -646,6 +687,7 @@ function initApp() {
     console.log('🎬 Initializing app...');
     colorizeNotesWithText();
     initTableSorting();
+    applySavedSort();  // Appliquer le tri sauvegardé depuis le cache
     initEditableNotes();
     initLazyLoad();
     initStickyElements();

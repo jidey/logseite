@@ -5,13 +5,17 @@
   <title>VM Nightly Update Configuration</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- Theme init (avant CSS pour éviter le flash) -->
+  <script src="js/theme.js"></script>
+
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="css/theme.css" rel="stylesheet" />
 
   <style>
     body {
       padding: 2rem;
-      background: #f8f9fa;
+      background: var(--bg-primary);
     }
 	
     .toast-container {
@@ -30,9 +34,14 @@
 </head>
 <body>
 
+  <!-- Theme Toggle Button -->
+  <button id="themeToggle" class="btn btn-sm btn-outline-secondary theme-toggle-btn" title="Toggle Dark/Light Mode" onclick="toggleTheme()">
+    🌙 Dark
+  </button>
+
   <div class="container">
     <h1 class="mb-4 text-center">VM Nightly Update Configuration</h1>
-	<h4 class="mb-2 text-center"><a href="https://build-sqs.cas-software.dev/view/Deployments/job/SQS-Selenium-WebServer-Deploy/" target="_blank">Jenkins</a></h4>
+	<h4 class="mb-2 text-center"><a href="https://build-sqs.cas-software.dev/view/Deployments/job/SQS-gWServer-Deploy/" target="_blank">Jenkins Deploy</a></h4>
 	
     <!-- Nav tabs -->
     <ul class="nav nav-tabs mb-3" id="vmTabs" role="tablist">
@@ -132,7 +141,7 @@
           <table class="table table-bordered table-striped align-middle text-center">
             <thead class="table-light">
               <tr>
-                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?LogVersion=we_dev&Testtype=we_dev&Product=weWebSel&TestBrowser=chrome" target="_blank">Logs</a>)</th>
+                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x17" target="_blank">Logs</a>)</th>
                 <?php
                 foreach ($branches as $branch) {
 					if ($branch === 'wehf') {

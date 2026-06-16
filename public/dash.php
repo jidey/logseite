@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SQS Dashboard</title>
+    <!-- Theme init (avant CSS pour éviter le flash) -->
+    <script src="js/theme.js"></script>
     <!-- Inclure Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/theme.css" rel="stylesheet">
 	<style type="text/css">
 		.tg  {border-collapse:collapse;border-spacing:0;margin:0px auto;}
 		
@@ -291,6 +294,10 @@
 		// //header("Location: " . $url);
 	}	
 	?>
+	<!-- Theme Toggle Button -->
+	<button id="themeToggle" class="btn btn-sm btn-outline-secondary theme-toggle-btn" title="Toggle Dark/Light Mode" onclick="toggleTheme()">
+		🌙 Dark
+	</button>
 	<center>
 	<br><a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php"><< UI-TESTS STATUS Summary</a><br><br>
 	</center>	
