@@ -378,7 +378,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                            data-jparam="<?php echo htmlspecialchars($scenario['JParam'] ?? ''); ?>"
                                            data-testtype="<?php echo htmlspecialchars($testType); ?>"
                                            data-product="<?php echo htmlspecialchars($product); ?>">
-                                            ▶ Run
+                                            Run
                                         </a>
                                     <?php endif; ?>
                                 </td>
@@ -390,11 +390,11 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     
                                     if (!empty($logLink)) {
                                         echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-info" title="View Allure report">';
-                                        echo '📋 Log';
+                                        echo 'Allure';
                                         echo '</a>';
                                     } else {
                                         echo '<button type="button" class="btn btn-sm btn-secondary" disabled title="No log available">';
-                                        echo '📋 N/A';
+                                        echo 'N/A';
                                         echo '</button>';
                                     }
                                     ?>

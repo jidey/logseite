@@ -180,7 +180,7 @@ try {
                 $currentTeamTag = $testset['teamtag'] ?? '';
                 // Normaliser les valeurs vides/0/1 à @team_sqs
                 if (empty($currentTeamTag) || $currentTeamTag === '0' || $currentTeamTag === '1') {
-                    $currentTeamTag = '@team_sqs';
+                    $currentTeamTag = '';
                 }
                 if ($currentTeamTag !== $teamTag) {
                     return false;
@@ -407,11 +407,11 @@ if (empty($testTypesForProduct)) {
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <div style="display: flex; align-items: center; gap: 20px;">
-                            <h1 style="margin: 0;">🧪 Automated Tests - Logs</h1>
+                            <h1><style="margin: 0 style="font-size: 25px;">🧪 Automated Tests - Logs</h1>
                             <?php
                                 $deployedBuild = getDeployedBuild($testType, $product);
                                 if (!empty($deployedBuild)) {
-                                    echo '<div style="font-size: 14px;">';
+                                    echo '<div style="font-size: 25px;">';
                                     echo '<strong>Deployed Build:</strong> <span style="color: #28a745; font-weight: bold;">' . htmlspecialchars($deployedBuild) . '</span>';
                                     echo '</div>';
                                     echo '<script>console.log("📦 Deployed Build: ' . htmlspecialchars($deployedBuild) . '");</script>';
@@ -424,10 +424,10 @@ if (empty($testTypesForProduct)) {
                     <div class="col-md-4 text-end">
                         <div style="margin-bottom: 15px; display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
                             <a href="dash.php" class="btn btn-sm btn-primary" target="_blank" title="Global Dashboard">
-                                📊 Dashboard
+                                📊 Release Dashboard
                             </a>
-                            <a href="vm_config.php" class="btn btn-sm btn-info" target="_blank" title="VM Nightly Update Configuration">
-                                ⚙️ Configuration
+                            <a href="vm_config.php" class="btn btn-sm btn-info" target="_blank" title="VM Nightly Deployments Configuration">
+                                ⚙️ Deployments
                             </a>
                             <a href="cache_management.php" class="btn btn-sm btn-secondary" title="Cache Management">
                                 💾 Cache
@@ -524,7 +524,7 @@ if (empty($testTypesForProduct)) {
 
                     <!-- TestSet Name -->
                     <div>
-                        <label for="testsetFilter" class="form-label"><strong>TestSet Name</strong></label>
+                        <label for="testsetFilter" class="form-label"><strong>Search Testaet</strong></label>
                         <div style="position: relative; display: flex; align-items: center;">
                             <input type="text" class="form-control" id="testsetFilter" name="TestsetFilter" 
                                value="<?php echo htmlspecialchars($testsetFilter); ?>" 
@@ -672,7 +672,7 @@ if (empty($testTypesForProduct)) {
                                 <td align='center'>
                                     <a href="details.php?Testtype=<?php echo urlencode($testType); ?>&Product=<?php echo urlencode($product); ?>&AutoID=<?php echo urlencode($testset['AutoID']); ?>&OnlyFailed=<?php echo $errorOnly ? '1' : '0'; ?>" 
                                        class="btn btn-sm btn-primary" title="View Testcases details">
-                                        🔍 Details
+                                        Details
                                     </a>
                                 </td>
                                 
@@ -683,11 +683,11 @@ if (empty($testTypesForProduct)) {
                                     
                                     if (!empty($logLink)) {
                                         echo '<a href="' . htmlspecialchars($logLink) . '" target="_blank" class="btn btn-sm btn-info" title="View Allure report">';
-                                        echo '📋 Allure';
+                                        echo 'Allure';
                                         echo '</a>';
                                     } else {
                                         echo '<button type="button" class="btn btn-sm btn-secondary" disabled title="No log available">';
-                                        echo '📋 N/A';
+                                        echo 'N/A';
                                         echo '</button>';
                                     }
                                     ?>
@@ -736,7 +736,7 @@ if (empty($testTypesForProduct)) {
                                              'data-testtype="' . htmlspecialchars($testType) . '" ' .
                                              'data-product="' . htmlspecialchars($product) . '" ' .
                                              'title="Run this TestSet">';
-                                        echo '▶ Run';
+                                        echo 'Run';
                                         echo '</a>';
                                     }
                                     ?>

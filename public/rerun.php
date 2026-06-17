@@ -584,30 +584,33 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
         $test = $test . "&RETRY_FAILED=true";
     }
     
-    // Envoyer les requêtes via POST (Jenkins nécessite POST, pas GET)
+    // Envoyer les requêtes via GET (Jenkins utilise les paramètres d'URL/query string)
+    // Comme quand on colle l'URL directement dans le navigateur
     
-    // Fonction pour envoyer une requête POST
-    function sendPostRequest($url) {
+    // Fonction pour envoyer une requête GET
+    function sendGetRequest($url) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_HTTPGET, true);          // Méthode GET
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    // Suivre les redirections
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
         curl_close($ch);
         
-        return ['code' => $httpCode, 'response' => $response];
+        return ['code' => $httpCode, 'response' => $response, 'error' => $error];
     }
     
-    // Envoyer la requête de vérification
-    @sendPostRequest($runn);
+    // Envoyer la requête de vérification (check.php : met running=2)
+    @sendGetRequest($runn);
     
     // Envoyer la requête de test à Jenkins
-    @sendPostRequest($test);
+    @sendGetRequest($test);
     
     // Rediriger vers le log
     header("Location: " . $logurl);
