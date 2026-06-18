@@ -89,21 +89,33 @@
 				'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
 			],
 		]);
-		$jsonData = file_get_contents($url, false, $context);
+		$jsonData = @file_get_contents($url, false, $context);
+
+		// Si la requête échoue (SSL, réseau, timeout), retourner null
+		if ($jsonData === false) {
+			error_log("file_get_contents failed for tag: $tag (SSL/network issue)");
+			return null;
+		}
 
 		$data = json_decode($jsonData, true);
 
 		if ($data !== null) {
-			$version = $data['_embedded']['versions'][0]['smartDesignVersion'];
+			// Vérifier que la structure attendue existe
+			if (!isset($data['_embedded']['versions'][0])) {
+				error_log("Unexpected JSON structure for tag: $tag");
+				return null;
+			}
+			
+			$versionData = $data['_embedded']['versions'][0];
+			$version = $versionData['smartDesignVersion'] ?? '';
 			$sdversion = explode("-", $version);
-			$branch = $data['_embedded']['versions'][0]['branch'];
-			$commitId = $data['_embedded']['versions'][0]['commitId'];
+			$branch = $versionData['branch'] ?? '';
+			$commitId = $versionData['commitId'] ?? '';
 			$wecommit = substr($commitId, 0, 6); // start from position 6
 			
-			return [$branch, $sdversion[0], $wecommit];		
+			return [$branch, $sdversion[0] ?? '', $wecommit];		
 		} else {
-			http_response_code(400);
-			echo "Invalid JSON data for tag: $tag";
+			error_log("Invalid JSON data for tag: $tag");
 			return null;
 		}
 	}
@@ -230,9 +242,9 @@
 	$WeRCVersion = getBranchVersion("Wewerc");
 	$WeHFVersion = getBranchVersion("Wewehf");
 	
-	[$WeDevVersion, $sdweDEV, $commitIdDEV] = getBranchVersionWe("dev");						
-	[$WeRCVersion, $sdweRC, $commitIdRC] = getBranchVersionWe("rc");
-	[$WeHFVersion, $sdweHF, $commitIdHF] = getBranchVersionWe("hotfix");
+	[$WeDevVersion, $sdweDEV, $commitIdDEV] = getBranchVersionWe("dev") ?? ['', '', ''];						
+	[$WeRCVersion, $sdweRC, $commitIdRC] = getBranchVersionWe("rc") ?? ['', '', ''];
+	[$WeHFVersion, $sdweHF, $commitIdHF] = getBranchVersionWe("hotfix") ?? ['', '', ''];
 	
 	
 	$WebDevVersion = getBranchVersion("Seldev18");

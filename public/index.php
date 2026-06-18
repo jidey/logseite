@@ -187,10 +187,12 @@ try {
                 }
             }
             
-            // Filter by errors only
+            // Filter by errors only (garde aussi les tests en cours "running")
             if ($errorOnly) {
                 $failed = $testset['TearDownFailed'] ?? 0;
-                if ($failed === 0) {
+                $running = $testset['running'] ?? $testset['Running'] ?? 0;
+                // Garder si : a des échecs OU est en cours d'exécution
+                if ($failed == 0 && $running != 2) {
                     return false;
                 }
             }
@@ -318,15 +320,12 @@ if (empty($testTypesForProduct)) {
             let appliedTheme = 'light'; // Défaut
             
             if (savedTheme === 'dark') {
-                // Mode sombre sauvegardé
                 appliedTheme = 'dark';
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else if (savedTheme === 'light') {
-                // Mode clair sauvegardé
                 appliedTheme = 'light';
                 document.documentElement.setAttribute('data-theme', 'light');
             } else {
-                // Pas de préférence sauvegardée, utiliser la préférence système
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     appliedTheme = 'dark';
                     document.documentElement.setAttribute('data-theme', 'dark');
@@ -336,24 +335,19 @@ if (empty($testTypesForProduct)) {
                 }
             }
             
-            // Stocker le thème appliqué pour utilisation après le chargement du DOM
             window.initialTheme = appliedTheme;
         })();
     </script>
     
     <!-- Early Filters Redirect: applique TOUS les filtres du cache AVANT le rendu -->
-    <!-- Priorité : charger directement les données filtrées selon les préférences sauvegardées -->
     <script>
         (function() {
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Détecter si c'est un "premier chargement" (aucun filtre dans l'URL)
-            // On considère que si Product n'est pas dans l'URL, l'utilisateur arrive "à neuf"
             const hasAnyFilter = urlParams.has('Product') || urlParams.has('Testtype') || 
                                  urlParams.has('TeamTag') || urlParams.has('ErrorOnly');
             
             if (!hasAnyFilter) {
-                // Charger les préférences depuis le cache unifié
                 let prefs = {};
                 try {
                     const cached = localStorage.getItem('logg-prefs');
@@ -362,28 +356,23 @@ if (empty($testTypesForProduct)) {
                 
                 let needsRedirect = false;
                 
-                // Product
                 if (prefs.product) {
                     urlParams.set('Product', prefs.product);
                     needsRedirect = true;
                 }
-                // Branch (Testtype)
                 if (prefs.testtype) {
                     urlParams.set('Testtype', prefs.testtype);
                     needsRedirect = true;
                 }
-                // Team
                 if (prefs.team_tag) {
                     urlParams.set('TeamTag', prefs.team_tag);
                     needsRedirect = true;
                 }
-                // Error Only
                 if (prefs.error_only === 1 || prefs.error_only === '1') {
                     urlParams.set('ErrorOnly', '1');
                     needsRedirect = true;
                 }
                 
-                // Rediriger une seule fois avec tous les filtres
                 if (needsRedirect) {
                     window.location.replace(window.location.pathname + '?' + urlParams.toString());
                 }
@@ -407,7 +396,7 @@ if (empty($testTypesForProduct)) {
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <div style="display: flex; align-items: center; gap: 20px;">
-                            <h1><style="margin: 0 style="font-size: 25px;">🧪 Automated Tests - Logs</h1>
+                            <h1 style="margin: 0; font-size: 25px;">🧪 Automated Tests - Logs</h1>
                             <?php
                                 $deployedBuild = getDeployedBuild($testType, $product);
                                 if (!empty($deployedBuild)) {
@@ -460,7 +449,6 @@ if (empty($testTypesForProduct)) {
                         <label for="product" class="form-label"><strong>Product</strong></label>
                         <select class="form-select" id="product" name="Product" style="width: 100%;">
                             <?php 
-                            // Mapping des noms affichés pour les produits
                             $productMapping = [
                                 'gWWebSel' => 'gW Web',
                                 'weWebSel' => 'smartWe',
@@ -491,10 +479,8 @@ if (empty($testTypesForProduct)) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php 
-                                // Branches pas encore disponibles : affichées entre parenthèses
                                 $notYetAvailable = ['rc_x18', 'hf_x18'];
                                 foreach ($testTypesForProduct as $v): 
-                                    // Label avec parenthèses si la branche n'existe pas encore
                                     $displayLabel = in_array($v, $notYetAvailable) ? "($v)" : $v;
                                 ?>
                                     <option value="<?php echo htmlspecialchars($v); ?>" 
@@ -524,7 +510,7 @@ if (empty($testTypesForProduct)) {
 
                     <!-- TestSet Name -->
                     <div>
-                        <label for="testsetFilter" class="form-label"><strong>Search Testaet</strong></label>
+                        <label for="testsetFilter" class="form-label"><strong>Search Testset</strong></label>
                         <div style="position: relative; display: flex; align-items: center;">
                             <input type="text" class="form-control" id="testsetFilter" name="TestsetFilter" 
                                value="<?php echo htmlspecialchars($testsetFilter); ?>" 
@@ -625,7 +611,6 @@ if (empty($testTypesForProduct)) {
                                     $testedBuild = trim($testset['Build'] ?? '');
                                     $deployedBuild = getDeployedBuild($testType, $product);
                                     
-                                    // DEBUG: Simple logs
                                     $isSmartWe = (strpos($product, 'weWebSel') !== false || strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
                                     echo '<script>console.log("🔧 [' . htmlspecialchars($product) . ' / ' . htmlspecialchars($testType) . '] Deployed Build: " + ((' . json_encode($deployedBuild) . ') ? "✅ Found" : "❌ NULL"));</script>';
                                     
@@ -636,14 +621,11 @@ if (empty($testTypesForProduct)) {
                                         $deployedBuildTrimmed = trim($deployedBuild);
                                         
                                         if ($isSmartWe) {
-                                            // Extract short hash from tested version (format: "we DEV #1470a9")
                                             if (preg_match('/#([a-f0-9]+)/', $testedBuild, $matches)) {
-                                                $testedHash = $matches[1]; // 1470a9
-                                                // Compare short hash with beginning of full hash
+                                                $testedHash = $matches[1];
                                                 $isMatch = (strpos($deployedBuildTrimmed, $testedHash) === 0);
                                             }
                                         } else {
-                                            // For gWWebSel: exact comparison
                                             $isMatch = ($testedBuild === $deployedBuildTrimmed);
                                         }
                                         
@@ -696,14 +678,12 @@ if (empty($testTypesForProduct)) {
                                 <!-- Run -->
                                 <td class="text-center">
                                     <?php 
-                                    // Construire l'URL de retour vers index.php avec les filtres actuels
                                     $returnUrl = "https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?" .
                                                  "Product=" . urlencode($product) . 
                                                  "&Testtype=" . urlencode($testType) . 
                                                  "&TestBrowser=" . urlencode($browser ?? 'chrome') .
                                                  "&ErrorOnly=" . ($errorOnly ? '1' : '0');
                                     
-                                    // Lien vers rerun.php
                                     $runLink = "rerun.php?JJob=" . urlencode($testset['JJob']) . 
                                                "&JParam=" . urlencode($testset['JParam']) . 
                                                "&Testset=" . urlencode($testset['JParam']) . 
@@ -717,7 +697,6 @@ if (empty($testTypesForProduct)) {
                                     
                                     $runningStatus = $testset['running'] ?? $testset['Running'] ?? 0;
                                     if ($runningStatus == 2) {
-                                        // Bouton "Running" cliquable pour réinitialiser le statut
                                         echo '<button type="button" class="btn btn-sm btn-warning reset-running-btn" ' .
                                              'data-jjob="' . htmlspecialchars($testset['JJob']) . '" ' .
                                              'data-jparam="' . htmlspecialchars($testset['JParam']) . '" ' .
@@ -728,7 +707,6 @@ if (empty($testTypesForProduct)) {
                                         echo '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
                                         echo '</button>';
                                     } else {
-                                        // Bouton "Run" pour lancer le test
                                         echo '<a href="' . htmlspecialchars($runLink) . '" target="_self" ' .
                                              'class="btn btn-sm btn-success run-link" ' .
                                              'data-jjob="' . htmlspecialchars($testset['JJob']) . '" ' .
@@ -749,15 +727,11 @@ if (empty($testTypesForProduct)) {
                                         $duration = $testset['RunDuration'] ?? null;
                                         
                                         if (!empty($duration)) {
-                                            // Convertir la durée en heures et minutes
-                                            // Supposer que RunDuration est en secondes ou en format HH:MM:SS
                                             if (is_numeric($duration)) {
-                                                // Si c'est en secondes
                                                 $hours = intval($duration / 3600);
                                                 $minutes = intval(($duration % 3600) / 60);
                                                 echo sprintf("%dh %02dm", $hours, $minutes);
                                             } else {
-                                                // Si c'est déjà au format HH:MM:SS
                                                 echo htmlspecialchars($duration);
                                             }
                                         } else {
@@ -782,7 +756,6 @@ if (empty($testTypesForProduct)) {
                                 
                                 <!-- Notes -->
                                 <?php 
-                                // Récupérer les notes depuis la table _tags
                                 $testSetNotes = $repo->getTestSetNotes($testType, $testset['JJob'], $testset['JParam'], $product);
                                 ?>
                                 <td class="notes notes-cell" 
@@ -803,7 +776,6 @@ if (empty($testTypesForProduct)) {
                                 <td style="text-align: center;">
                                     <small><?php 
                                         $teamtag = $testset['teamtag'] ?? '';
-                                        // Si vide, 0, 1, ou autre valeur invalide, afficher @team_sqs
                                         if (empty($teamtag) || $teamtag === '0' || $teamtag === '1') {
                                             echo '@team_sqs';
                                         } else {
@@ -822,7 +794,6 @@ if (empty($testTypesForProduct)) {
             <?php if ($totalPages > 1): ?>
             <nav aria-label="Pagination" style="margin-top: 20px;">
                 <ul class="pagination justify-content-center mb-0">
-                    <!-- Previous Button -->
                     <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
                         <a class="page-link" href="<?php echo buildPaginationUrl(1, $product, $testType, $browser, $testsetFilter, $teamTag, $errorOnly); ?>" tabindex="-1">
                             « First
@@ -834,7 +805,6 @@ if (empty($testTypesForProduct)) {
                         </a>
                     </li>
                     
-                    <!-- Page Numbers (show max 5 pages) -->
                     <?php
                     $start = max(1, $page - 2);
                     $end = min($totalPages, $page + 2);
@@ -855,7 +825,6 @@ if (empty($testTypesForProduct)) {
                     }
                     ?>
                     
-                    <!-- Next Button -->
                     <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
                         <a class="page-link" href="<?php echo buildPaginationUrl($page + 1, $product, $testType, $browser, $testsetFilter, $teamTag, $errorOnly); ?>">
                             Next ›
@@ -889,9 +858,7 @@ if (empty($testTypesForProduct)) {
 
     <!-- Theme Toggle Script -->
     <script>
-        // Mettre à jour le bouton au chargement
         document.addEventListener('DOMContentLoaded', function() {
-            // Appliquer les classes de thème basées sur le thème initial déterminé
             if (window.initialTheme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
@@ -902,23 +869,17 @@ if (empty($testTypesForProduct)) {
             
             updateThemeButton();
             
-            // ════════════════════════════════════════════════════════════
             // GESTION CENTRALISÉE DES FILTRES
-            // Chaque changement : 1) sauvegarde le cache  2) soumet le formulaire
-            // ════════════════════════════════════════════════════════════
-            
-            // Filtres qui déclenchent une soumission (rechargement avec nouvelles données)
             ['product', 'testtype', 'teamtag'].forEach(function(id) {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('change', function() {
-                        savePreferences();       // Sauvegarder AVANT
-                        this.form.submit();      // Puis soumettre
+                        savePreferences();
+                        this.form.submit();
                     });
                 }
             });
             
-            // Boutons radio ErrorOnly
             const errorsOffBtn = document.getElementById('errorsOffBtn');
             const errorsOnBtn = document.getElementById('errorsOnBtn');
             
@@ -942,7 +903,6 @@ if (empty($testTypesForProduct)) {
                 });
             }
             
-            // Champ de recherche TestSet : sauvegarder à chaque frappe (sans soumettre)
             const testsetInput = document.getElementById('testsetFilter');
             if (testsetInput) {
                 testsetInput.addEventListener('input', function() {
@@ -950,7 +910,6 @@ if (empty($testTypesForProduct)) {
                 });
             }
             
-            // Gérer le bouton de suppression du filtre Testset Name
             const clearBtn = document.getElementById('clearTestsetFilter');
             if (clearBtn) {
                 clearBtn.addEventListener('click', function(e) {
@@ -982,11 +941,9 @@ if (empty($testTypesForProduct)) {
             const isDarkMode = document.body.classList.contains('dark-mode');
             
             if (isDarkMode) {
-                // Passer en mode clair
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
             } else {
-                // Passer en mode sombre
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
             }
@@ -995,12 +952,10 @@ if (empty($testTypesForProduct)) {
             savePreferences();
         }
         
-        // Apply text size changes
         function applyTextSize(percentage) {
-            const baseFontSize = 14; // Base font size in pixels
+            const baseFontSize = 14;
             const newFontSize = (baseFontSize * percentage) / 100;
             
-            // Create or update style tag
             let styleTag = document.getElementById('text-size-style');
             if (!styleTag) {
                 styleTag = document.createElement('style');
@@ -1008,7 +963,6 @@ if (empty($testTypesForProduct)) {
                 document.head.appendChild(styleTag);
             }
             
-            // Apply CSS rule to override all table text sizes
             styleTag.innerHTML = `
                 .results-table,
                 table {
@@ -1028,18 +982,14 @@ if (empty($testTypesForProduct)) {
             `;
         }
         
-        // Text size slider - Déclarer avant loadUserPreferences
         const textSizeSlider = document.getElementById('textSizeSlider');
         
-        // Load user preferences from local cache on page load
         function loadUserPreferences() {
             const cached = localStorage.getItem('logg-prefs');
             const prefs = cached ? JSON.parse(cached) : {};
             
-            // Get URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             
-            // Apply theme
             const theme = prefs.theme || 'light';
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
@@ -1050,14 +1000,12 @@ if (empty($testTypesForProduct)) {
             }
             updateThemeButton();
             
-            // Apply text size
             if (textSizeSlider) {
                 const textSize = prefs.text_size || 100;
                 textSizeSlider.value = textSize;
                 applyTextSize(parseInt(textSize));
             }
             
-            // Apply filter values - if GET params are not set, use saved preferences
             const productSelect = document.getElementById('product');
             const testtypeSelect = document.getElementById('testtype');
             const browserSelect = document.getElementById('browser');
@@ -1078,7 +1026,6 @@ if (empty($testTypesForProduct)) {
                 teamtagSelect.value = prefs.team_tag;
             }
             
-            // Apply ErrorOnly radio buttons
             if (!urlParams.has('ErrorOnly')) {
                 if (prefs.error_only === 1 && errorsOnBtn) {
                     errorsOnBtn.checked = true;
@@ -1088,7 +1035,6 @@ if (empty($testTypesForProduct)) {
             }
         }
         
-        // Save preferences to local cache
         function savePreferences() {
             const browserEl = document.getElementById('browser');
             const prefs = {
@@ -1104,10 +1050,8 @@ if (empty($testTypesForProduct)) {
             localStorage.setItem('logg-prefs', JSON.stringify(prefs));
         }
         
-        // Load preferences on page load
         loadUserPreferences();
         
-        // Sécurité : sauvegarder aussi au submit du formulaire (synchrone)
         const filterForm = document.querySelector('form');
         if (filterForm) {
             filterForm.addEventListener('submit', function() {
@@ -1115,7 +1059,6 @@ if (empty($testTypesForProduct)) {
             });
         }
         
-        // Gérer le clic sur l'icône "running" pour la réinitialiser
         document.querySelectorAll('.reset-running-btn').forEach(btn => {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -1127,11 +1070,9 @@ if (empty($testTypesForProduct)) {
                 const product = this.dataset.product;
                 const btnElement = this;
                 
-                // Feedback visuel
                 btnElement.style.opacity = '0.5';
                 btnElement.style.pointerEvents = 'none';
                 
-                // Appel direct à check.php pour réinitialiser le statut (running=0)
                 fetch('check.php?value=0&field=running' +
                       '&autoid=' + encodeURIComponent(this.dataset.autoid || '') +
                       '&LogVersion=' + encodeURIComponent(testType) +
@@ -1142,7 +1083,6 @@ if (empty($testTypesForProduct)) {
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Feedback puis rafraîchir
                             btnElement.style.opacity = '1';
                             setTimeout(() => {
                                 location.reload();
@@ -1162,21 +1102,16 @@ if (empty($testTypesForProduct)) {
             });
         });
         
-        // Gérer le clic sur les boutons Run pour les transformer en "Running"
-        // Note: check.php (appelé par rerun.php via $runn) met running=2 côté serveur
         document.querySelectorAll('.run-link').forEach(link => {
             link.addEventListener('click', function(e) {
-                // Ne pas empêcher la navigation, juste transformer le bouton
-                // Transformer le bouton "Run" en "Running"
                 this.classList.remove('btn-success');
                 this.classList.add('btn-warning');
                 this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
                 this.title = 'Test is running';
-                this.style.pointerEvents = 'none'; // Éviter double-clic
+                this.style.pointerEvents = 'none';
             });
         });
         
-        // Text size slider event listener
         if (textSizeSlider) {
             textSizeSlider.addEventListener('input', function() {
                 const size = this.value;
