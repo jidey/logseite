@@ -92,6 +92,9 @@
 			'hf_x17'  => 'x17_gwhf',
 			'rc_x17'  => 'x17_gwrc',
 			'dev_x17' => 'x17_gwdev',
+			'hf_x18'  => 'x18_gwhf',
+			'rc_x18'  => 'x18_gwrc',
+			'dev_x18' => 'x18_gwdev',
 		];
 		if (isset($gwClientMap[$Testtype])) {
 			$LogVersion = $gwClientMap[$Testtype];

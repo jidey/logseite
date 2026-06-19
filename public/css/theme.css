@@ -285,3 +285,109 @@ body.dark-mode .form-check-input:checked {
 .form-check-input:hover {
     border-color: #28a745 !important;
 }
+
+
+
+/* ═══════════════════════════════════════════════════════════════
+   STATS.PHP - Bootstrap 3 panels & tables en dark mode
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Panels Bootstrap 3 */
+body.dark-mode .panel {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .panel-primary > .panel-heading {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.dark-mode .panel-body {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body.dark-mode .panel-heading h5 a,
+body.dark-mode .panel-heading a {
+    color: #5aa9ff;
+}
+
+/* Tableaux Bootstrap 3 en dark mode */
+body.dark-mode .table-bordered {
+    border-color: var(--border-color);
+}
+
+body.dark-mode .table-bordered > thead > tr > th,
+body.dark-mode .table-bordered > tbody > tr > td {
+    border-color: #555 !important;
+}
+
+body.dark-mode .table > thead > tr > th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: #555;
+}
+
+/* Cellules de statut Bootstrap 3 : texte foncé lisible sur fonds colorés */
+.table > tbody > tr > td.success,
+.table > tbody > tr > td.success b,
+.table > tbody > tr > td.success font,
+body.dark-mode .table > tbody > tr > td.success,
+body.dark-mode .table > tbody > tr > td.success b,
+body.dark-mode .table > tbody > tr > td.success font {
+    background-color: #c3e6cb !important;
+    color: #1a1a1a !important;
+}
+
+.table > tbody > tr > td.warning,
+.table > tbody > tr > td.warning b,
+.table > tbody > tr > td.warning font,
+body.dark-mode .table > tbody > tr > td.warning,
+body.dark-mode .table > tbody > tr > td.warning b,
+body.dark-mode .table > tbody > tr > td.warning font {
+    background-color: #ffeeba !important;
+    color: #1a1a1a !important;
+}
+
+.table > tbody > tr > td.danger,
+.table > tbody > tr > td.danger b,
+.table > tbody > tr > td.danger font,
+body.dark-mode .table > tbody > tr > td.danger,
+body.dark-mode .table > tbody > tr > td.danger b,
+body.dark-mode .table > tbody > tr > td.danger font {
+    background-color: #f5c6cb !important;
+    color: #1a1a1a !important;
+}
+
+/* Couleurs spéciales pour les <font color> (warning orange, failed red) sur fond pâle */
+body.dark-mode .table > tbody > tr > td.warning font[color="orange"],
+.table > tbody > tr > td.warning font[color="orange"] {
+    color: #b8860b !important;  /* orange foncé lisible */
+}
+
+body.dark-mode .table > tbody > tr > td.danger font[color="red"],
+.table > tbody > tr > td.danger font[color="red"] {
+    color: #c0392b !important;  /* rouge foncé lisible */
+}
+
+/* Cellules normales (TestNode, Build, RunDate, Duration, ID) en dark mode */
+body.dark-mode .table > tbody > tr > td {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Liens dans les tableaux (Test Log, Display ALL) */
+body.dark-mode .table a {
+    color: #5aa9ff;
+}
+
+/* Lien retour Teststatus + More... */
+body.dark-mode .container-fluid a {
+    color: #5aa9ff;
+}
+
+body.dark-mode h3, body.dark-mode h5 {
+    color: var(--text-primary);
+}

@@ -600,9 +600,23 @@ if (empty($testTypesForProduct)) {
                             <?php foreach ($testsets as $testset): ?>
                             <tr>
                                 <!-- TestSet -->
+                                <?php
+                                    // Construire le lien vers stats.php
+                                    // LogVersion = nom de table (ex: dev_x17 + gWWebSel → x17_dev)
+                                    $statsLogVersion = $repo->getTableForTestType($testType, $product);
+                                    $statsLink = "stats.php?LogVersion=" . urlencode($statsLogVersion) .
+                                                 "&JJob=" . urlencode($testset['JJob']) .
+                                                 "&Product=" . urlencode($product) .
+                                                 "&TestBrowser=" . urlencode($browser ?? 'chrome') .
+                                                 "&Testtype=" . urlencode($testType) .
+                                                 "&Filter=no" .
+                                                 "&TestProject=" . urlencode($testset['JParam'] ?? '');
+                                ?>
                                 <td data-sort-value="<?php echo htmlspecialchars($testset['JParam'] ?? 'N/A'); ?>">
                                     <div class="testset-name">
-                                        <?php echo htmlspecialchars($testset['JParam'] ?? 'N/A'); ?>
+                                        <a href="<?php echo htmlspecialchars($statsLink); ?>" title="View statistics for this TestSet">
+                                            <?php echo htmlspecialchars($testset['JParam'] ?? 'N/A'); ?>
+                                        </a>
                                     </div>
                                 </td>
                                 
@@ -776,8 +790,13 @@ if (empty($testTypesForProduct)) {
                                 <td style="text-align: center;">
                                     <small><?php 
                                         $teamtag = $testset['teamtag'] ?? '';
-                                        if (empty($teamtag) || $teamtag === '0' || $teamtag === '1') {
+                                        $jparam = $testset['JParam'] ?? '';
+                                        // Pour @nightly et @smokeTest : toujours @team_sqs
+                                        if (stripos($jparam, '@nightly') !== false || stripos($jparam, '@smokeTest') !== false) {
                                             echo '@team_sqs';
+                                        } elseif (empty($teamtag) || $teamtag === '0' || $teamtag === '1') {
+                                            // Vide/0/1 : laisser vide
+                                            echo '';
                                         } else {
                                             echo htmlspecialchars($teamtag);
                                         }
