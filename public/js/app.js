@@ -17,10 +17,10 @@
  * Initialiser le tri des colonnes
  */
 function initTableSorting() {
-    console.log('📊 initTableSorting called');
+    //console.log('📊 initTableSorting called');
     
     const sortableHeaders = document.querySelectorAll('th.sortable');
-    console.log('Found sortable headers:', sortableHeaders.length);
+    //console.log('Found sortable headers:', sortableHeaders.length);
     
     sortableHeaders.forEach(header => {
         header.addEventListener('click', function(e) {
@@ -149,17 +149,17 @@ function applySavedSort() {
 // ═══════════════════════════════════════════════════════════════
 
 function initEditableNotes() {
-    console.log('🔧 initEditableNotes called');
+    //console.log('🔧 initEditableNotes called');
     
     let noteCells = document.querySelectorAll('.notes-cell');
-    console.log('Found .notes-cell:', noteCells.length);
+    //console.log('Found .notes-cell:', noteCells.length);
     
     if (noteCells.length === 0) {
         noteCells = document.querySelectorAll('.notes');
         console.log('Fallback .notes found:', noteCells.length);
     }
     
-    console.log('📝 Total notes cells to edit:', noteCells.length);
+    //console.log('📝 Total notes cells to edit:', noteCells.length);
     
     noteCells.forEach((cell, index) => {
         if (!cell.classList.contains('notes-cell')) {
@@ -366,7 +366,7 @@ function initLazyLoad() {
     }, observerOptions);
 
     const images = document.querySelectorAll('img[data-src]');
-    console.log('Found lazy images:', images.length);
+    //console.log('Found lazy images:', images.length);
     images.forEach(img => {
         imageObserver.observe(img);
     });
@@ -388,7 +388,7 @@ function initLazyLoad() {
     }, observerOptions);
 
     const bgElements = document.querySelectorAll('.lazy-bg[data-src]');
-    console.log('Found lazy background elements:', bgElements.length);
+    //console.log('Found lazy background elements:', bgElements.length);
     bgElements.forEach(el => {
         bgObserver.observe(el);
     });
@@ -399,7 +399,7 @@ function initLazyLoad() {
 // ═══════════════════════════════════════════════════════════════
 
 function initStickyElements() {
-    console.log('📌 initStickyElements called');
+    //console.log('📌 initStickyElements called');
     
     const header = document.querySelector('.header');
     const stats = document.querySelector('.stats');
@@ -506,70 +506,67 @@ function updateResultDisplay(autoID, isChecked) {
         console.log('⚠️ Row not found:', autoID);
         return;
     }
-    
+
     const resultCell = row.querySelector('.result-cell');
     if (!resultCell) {
         console.log('⚠️ Result cell not found');
         return;
     }
-    
-    console.log('🔄 Updating result display for:', autoID);
-    
-    // Déterminer l'ancien statut en lisant le HTML actuel
-    const currentHTML = resultCell.innerHTML;
-    let wasFlaky = currentHTML.includes('result-flaky') || currentHTML.includes('Flaky');
-    let wasFailed = currentHTML.includes('result-failed') || currentHTML.includes('Failed');
-    
-    console.log('🔍 Ancien statut du HTML:', { autoID, wasFlaky, wasFailed, currentHTML: currentHTML.substring(0, 50), isChecked });
-    
+
+    // Statut d'origine du scénario (figé au chargement de la page)
+    const origin = row.getAttribute('data-original-result') || 'Passed';
+    console.log('🔄 updateResultDisplay:', { autoID, origin, isChecked });
+
+    // Calcul des deltas : validé => devient Passed
+    //   Failed  -> Passed : passed +1, failed -1
+    //   Flaky   -> Passed : passed +1, flaky  -1
+    //   Passed  -> Passed : rien
+    let dPassed = 0, dFlaky = 0, dFailed = 0;
+    if (origin === 'Failed') { dPassed = 1; dFailed = -1; }
+    else if (origin === 'Flaky') { dPassed = 1; dFlaky = -1; }
+
     if (isChecked) {
-        resultCell.innerHTML = '<span class="result-badge result-flaky">⚠️ Flaky</span>';
-        
-        // Si c'était Failed avant → passer en Flaky
-        if (wasFailed && !wasFlaky) {
-            console.log('✅ Détecté: Failed → Flaky, appel updateCounters(+1, -1)');
-            updateCounters(+1, -1);  // +1 Flaky, -1 Failed
-        } else {
-            console.log('⚠️ Statut inchangé ou déjà Flaky');
-        }
+        // Coché : afficher Passed
+        resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
+        updateCounters(dPassed, dFlaky, dFailed);
     } else {
-        resultCell.innerHTML = '<span class="result-badge result-failed">❌ Failed</span>';
-        
-        // Si c'était Flaky avant → passer en Failed
-        if (wasFlaky && !wasFailed) {
-            console.log('✅ Détecté: Flaky → Failed, appel updateCounters(-1, +1)');
-            updateCounters(-1, +1);  // -1 Flaky, +1 Failed
+        // Décoché : restaurer le statut d'origine + inverser les deltas
+        if (origin === 'Failed') {
+            resultCell.innerHTML = '<span class="result-badge result-failed">❌ Failed</span>';
+        } else if (origin === 'Flaky') {
+            resultCell.innerHTML = '<span class="result-badge result-flaky">⚠️ Flaky</span>';
         } else {
-            console.log('⚠️ Statut inchangé ou déjà Failed');
+            resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
         }
+        updateCounters(-dPassed, -dFlaky, -dFailed);
     }
 }
 
-function updateCounters(flakyDelta, failedDelta) {
+function updateCounters(passedDelta, flakyDelta, failedDelta) {
     const testsetInfo = document.querySelector('.testset-info');
     if (!testsetInfo) return;
-    
-    const statusFlaky = testsetInfo.querySelector('span.status-flaky');
+
+    const statusPassed = testsetInfo.querySelector('span.status-passed');
+    const statusFlaky  = testsetInfo.querySelector('span.status-flaky');
     const statusFailed = testsetInfo.querySelector('span.status-failed');
-    
-    if (!statusFlaky || !statusFailed) return;
-    
-    // Lire les valeurs actuelles
-    const flakyText = statusFlaky.textContent.trim();
-    const failedText = statusFailed.textContent.trim();
-    
-    let flaky = parseInt(flakyText.replace(/\D/g, '')) || 0;
-    let failed = parseInt(failedText.replace(/\D/g, '')) || 0;
-    
-    // Appliquer les deltas
-    flaky += flakyDelta;
-    failed += failedDelta;
-    
-    // Mettre à jour l'affichage
-    statusFlaky.textContent = '⚠️ ' + flaky;
-    statusFailed.textContent = '❌ ' + failed;
-    
-    console.log('✅ Compteurs mis à jour:', { flaky, failed });
+
+    if (statusPassed) {
+        let passed = parseInt(statusPassed.textContent.replace(/\D/g, '')) || 0;
+        passed += passedDelta;
+        statusPassed.textContent = '✅ ' + passed;
+    }
+    if (statusFlaky) {
+        let flaky = parseInt(statusFlaky.textContent.replace(/\D/g, '')) || 0;
+        flaky += flakyDelta;
+        statusFlaky.textContent = '⚠️ ' + flaky;
+    }
+    if (statusFailed) {
+        let failed = parseInt(statusFailed.textContent.replace(/\D/g, '')) || 0;
+        failed += failedDelta;
+        statusFailed.textContent = '❌ ' + failed;
+    }
+
+    console.log('✅ Compteurs mis à jour:', { passedDelta, flakyDelta, failedDelta });
 }
 
 function updateScenarioManual(autoID, isChecked, testType, product) {
@@ -605,9 +602,11 @@ console.log('🚀 App.js loaded');
 function updateTestSetStats() {
     console.log('🎯 updateTestSetStats called!');
     
-    // Récupérer l'AutoID du TestSet depuis l'URL
+    // Récupérer l'AutoID du TestSet + contexte depuis l'URL
     const urlParams = new URLSearchParams(window.location.search);
     const autoID = urlParams.get('AutoID');
+    const testType = urlParams.get('Testtype') || '';
+    const product  = urlParams.get('Product')  || '';
     
     if (!autoID) {
         console.error('❌ AutoID du TestSet non trouvé');
@@ -621,6 +620,7 @@ function updateTestSetStats() {
         return;
     }
     
+    const statusPassed = testsetInfo.querySelector('span.status-passed');
     const statusFlaky = testsetInfo.querySelector('span.status-flaky');
     const statusFailed = testsetInfo.querySelector('span.status-failed');
     
@@ -630,29 +630,35 @@ function updateTestSetStats() {
     }
     
     // Extraire les valeurs actuelles
+    const passedText = statusPassed ? statusPassed.textContent.trim() : '0';
     const flakyText = statusFlaky.textContent.trim();
     const failedText = statusFailed.textContent.trim();
     
+    let passed = parseInt(passedText.replace(/\D/g, '')) || 0;
     let flaky = parseInt(flakyText.replace(/\D/g, '')) || 0;
     let failed = parseInt(failedText.replace(/\D/g, '')) || 0;
     
-    console.log('📈 Valeurs actuelles affichées:', { flaky, failed });
-    console.log('📡 Saving stats to database for AutoID:', autoID);
+    //console.log('📈 Valeurs actuelles affichées:', { passed, flaky, failed });
+    //console.log('📡 Saving stats to database for AutoID:', autoID);
     
-    // Envoyer seulement Flaky et Failed
-    // PHP calculera Passed = TotalCount - Flaky - Failed
+    // Envoyer Passed, Flaky et Failed
     fetch('update_testset_stats.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: 'AutoID=' + encodeURIComponent(autoID) + 
-              '&Flaky=' + flaky + 
-              '&Failed=' + failed
+        body: `AutoID=${encodeURIComponent(autoID)}` +
+      `&Passed=${encodeURIComponent(passed)}` +
+      `&Flaky=${encodeURIComponent(flaky)}` +
+      `&Failed=${encodeURIComponent(failed)}` +
+      `&TestType=${encodeURIComponent(testType)}` +
+      `&Product=${encodeURIComponent(product)}`
+
+
     })
         .then(response => response.text())
         .then(text => {
-            console.log('📝 Response:', text);
+            //console.log('📝 Response:', text);
             try {
                 const data = JSON.parse(text);
                 if (data.success) {
@@ -678,20 +684,20 @@ function colorizeNotesWithText() {
             // Forcer avec style inline si classe ne fonctionne pas
             const isDarkMode = document.body.classList.contains('dark-mode');
             cell.style.backgroundColor = isDarkMode ? '#1a3a52' : '#e3f2fd';
-            console.log('✅ Notes colorisée:', text.substring(0, 30));
+            //console.log('✅ Notes colorisée:', text.substring(0, 30));
         }
     });
 }
 
 function initApp() {
-    console.log('🎬 Initializing app...');
+    //console.log('🎬 Initializing app...');
     colorizeNotesWithText();
     initTableSorting();
     applySavedSort();  // Appliquer le tri sauvegardé depuis le cache
     initEditableNotes();
     initLazyLoad();
     initStickyElements();
-    console.log('✅ App initialized successfully');
+    //console.log('✅ App initialized successfully');
 }
 
 if (document.readyState === 'loading') {

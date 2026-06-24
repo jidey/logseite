@@ -145,7 +145,7 @@ $cacheStats = $repo->getCacheStats();
         </div>
         
         <div class="mt-5">
-            <a href="index.php" class="btn btn-secondary">← Back to Logs</a>
+            <a href="index.php" class="btn btn-secondary">← Back</a>
         </div>
     </div>
 

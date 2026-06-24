@@ -69,10 +69,14 @@ function getDeployedBuild($testType, $product) {
     }
     
     // Read the deployed build file
-    if ($deployFile && file_exists($deployFile)) {
-        return trim(file_get_contents($deployFile));
-    }
-    
+	if ($deployFile && file_exists($deployFile)) {
+		$content = trim(file_get_contents($deployFile));
+		// SmartWe : ne garder que le hash court (6 premiers caractères)
+		if ($isSmartWe) {
+			$content = substr($content, 0, 6);
+		}
+		return $content;
+	}
     return null;
 }
 
@@ -258,7 +262,7 @@ $isGwDesktop = (strpos($product, 'gWClient') !== false);
 // Pour gW Desktop, forcer la liste de branches spécifique
 if ($isGwDesktop) {
     // Afficher toutes ces branches, qu'elles aient des données ou non
-    $testTypesForProduct = ['hf_x15', 'dev_x16', 'rc_x16', 'hf_x16', 'rc_x17', 'hf_x17'];
+    $testTypesForProduct = ['rc_x16', 'hf_x16', 'rc_x17', 'hf_x17', 'rc_x18', 'hf_x18'];
 } else {
     // Pour les autres produits (gW Web, etc.), exclure les branches obsolètes
     $excludedBranches = ['dev_x15'];  // Versions plus disponibles
@@ -400,10 +404,10 @@ if (empty($testTypesForProduct)) {
                             <?php
                                 $deployedBuild = getDeployedBuild($testType, $product);
                                 if (!empty($deployedBuild)) {
-                                    echo '<div style="font-size: 25px;">';
+                                    echo '<div style="font-size: 20px;">';
                                     echo '<strong>Deployed Build:</strong> <span style="color: #28a745; font-weight: bold;">' . htmlspecialchars($deployedBuild) . '</span>';
                                     echo '</div>';
-                                    echo '<script>console.log("📦 Deployed Build: ' . htmlspecialchars($deployedBuild) . '");</script>';
+                                    //echo '<script>console.log("📦 Deployed Build: ' . htmlspecialchars($deployedBuild) . '");</script>';
                                 } else {
                                     echo '<script>console.log("⚠️ No Deployed Build file found for: ' . htmlspecialchars($testType) . ' / ' . htmlspecialchars($product) . '");</script>';
                                 }
@@ -601,7 +605,7 @@ if (empty($testTypesForProduct)) {
                             <tr>
                                 <!-- TestSet -->
                                 <?php
-                                    // Construire le lien vers stats.php
+									// Construire le lien vers stats.php
                                     // LogVersion = nom de table (ex: dev_x17 + gWWebSel → x17_dev)
                                     $statsLogVersion = $repo->getTableForTestType($testType, $product);
                                     $statsLink = "stats.php?LogVersion=" . urlencode($statsLogVersion) .
@@ -626,7 +630,7 @@ if (empty($testTypesForProduct)) {
                                     $deployedBuild = getDeployedBuild($testType, $product);
                                     
                                     $isSmartWe = (strpos($product, 'weWebSel') !== false || strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
-                                    echo '<script>console.log("🔧 [' . htmlspecialchars($product) . ' / ' . htmlspecialchars($testType) . '] Deployed Build: " + ((' . json_encode($deployedBuild) . ') ? "✅ Found" : "❌ NULL"));</script>';
+                                    //echo '<script>console.log("🔧 [' . htmlspecialchars($product) . ' / ' . htmlspecialchars($testType) . '] Deployed Build: " + ((' . json_encode($deployedBuild) . ') ? "✅ Found" : "❌ NULL"));</script>';
                                     
                                     $formatTestedVersion = "gray"; // Default
                                     $isMatch = false;
@@ -698,10 +702,25 @@ if (empty($testTypesForProduct)) {
                                                  "&TestBrowser=" . urlencode($browser ?? 'chrome') .
                                                  "&ErrorOnly=" . ($errorOnly ? '1' : '0');
                                     
+                                    // Utiliser la dernière version déployée comme Build pour le rerun
+                                    // (au lieu de la version du dernier run). Fallback sur 'Last' si non trouvée.
+                                    // Utiliser la dernière version déployée comme Build pour le rerun
+                                    // (au lieu de la version du dernier run). Fallback sur 'Last' si non trouvée.
+                                    $deployedBuildForRun = getDeployedBuild($testType, $product);
+                                    $buildForRun = !empty($deployedBuildForRun) ? trim($deployedBuildForRun) : ($testset['Build'] ?? 'Last');
+									
+									// SmartWe : reconstruire le Build au format "we {BRANCH} #{hash court}"
+                                    // ex: deployed = ecd727eb6105... + branche dev  ->  "we DEV #ecd727"
+                                    if ($isSmartWe && !empty($deployedBuildForRun)) {
+                                        $shortHash = substr(trim($deployedBuildForRun), 0, 6);
+                                        // Extraire la branche depuis le testType (dev_x18 -> dev)
+                                        $weBranch = strtoupper(explode('_', $testType)[0]); // DEV / RC / HF
+                                        $buildForRun = "we " . $weBranch . " #" . $shortHash;
+                                    }
                                     $runLink = "rerun.php?JJob=" . urlencode($testset['JJob']) . 
                                                "&JParam=" . urlencode($testset['JParam']) . 
                                                "&Testset=" . urlencode($testset['JParam']) . 
-                                               "&Build=" . urlencode($testset['Build'] ?? 'Last') . 
+                                               "&Build=" . urlencode($buildForRun) . 
                                                "&AutoID=" . urlencode($testset['AutoID']) . 
                                                "&Testtype=" . urlencode($testType) . 
                                                "&LogVersion=" . urlencode($testType) . 

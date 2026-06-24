@@ -84,19 +84,19 @@ $ForDebug = 'false';
 if ($Testset == $JParam && empty($TCProj)) {
 	$JParam = "@dummy";
     $test = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins . 
-            "/buildWithParameters?token=TCAUTO&delay=10sec&TestName=" . $JParam . 
+            "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . $JParam . 
             "&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;
 } else {
 	if (!empty($TCProj)) {
 		 $TCProjOutline = explode(" outline", $TCProj);
         $TCProj = $TCProjOutline[0];
 		$test = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins . 
-            "/buildWithParameters?token=TCAUTO&delay=10sec&TestName=" . urlencode($TCProj) . 
+            "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . urlencode($TCProj) . 
             "&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;
     }
 	else {
 		$test = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins . 
-            "/buildWithParameters?token=TCAUTO&delay=10sec&TestName=@dummy&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;		
+            "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=@dummy&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;		
 	}
     
 }

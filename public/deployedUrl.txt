@@ -1,6 +1,3 @@
-wehf;https://sqs-smartwe-hf.internalk8s.home.cas.de/identity/login?ongoing=app;SDKTESTINGAPPS
-werc;https://sqs-smartwe-rc.internalk8s.home.cas.de/identity/login?ongoing=app;SDKTESTINGAPPS
-wedev;https://sqs-smartwe-dev.internalk8s.home.cas.de/identity/login?ongoing=app;SDKTESTINGAPPS
 x16hf;https://sqs-sel-x16hf.cas-software.dev/smartdesign/;TC_SEL16_APPSHF
 x16rc;https://sqs-sel-x16rc.cas-software.dev/smartdesign/;TC_SEL16_APPSRC
 x16dev;https://sqs-sel-x16dev.cas-software.dev/smartdesign/;TC_SEL16_APPSDEV

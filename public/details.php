@@ -96,12 +96,56 @@ try {
     
     // Convert to array and sort by date
     $scenarios = array_values($scenarioMap);
-    
-    // Apply filter: only failed scenarios
+
+    // Recalculer Passed / Flaky / Failed depuis les scénarios réels (AVANT tout filtre)
+    // Règle : un scénario validé (checked=1) compte comme Passed.
+    //         sinon -> Failed si TearDownFailed>0, Flaky si TearDownWarning>0, sinon Passed.
+    $calcPassed = 0;
+    $calcFlaky  = 0;
+    $calcFailed = 0;
+    foreach ($scenarios as $sc) {
+        if (!empty($sc['checked'])) {
+            $calcPassed++;                       // validé => Passed
+        } elseif (($sc['TearDownFailed'] ?? 0) > 0) {
+            $calcFailed++;
+        } elseif (($sc['TearDownWarning'] ?? 0) > 0) {
+            $calcFlaky++;                        // Flaky reste Flaky et est compté
+        } else {
+            $calcPassed++;
+        }
+    }
+    // Injecter dans $testset pour l'affichage de .testset-info
+    $testset['TearDownPassed']  = $calcPassed;
+    $testset['TearDownWarning'] = $calcFlaky;
+    $testset['TearDownFailed']  = $calcFailed;
+
+    // Apply filter: only failed scenarios (après le calcul des totaux)
     if ($onlyFailed) {
         $scenarios = array_filter($scenarios, function($scenario) {
             return ($scenario['TearDownFailed'] ?? 0) > 0;
         });
+    }
+	
+	// Persister les totaux recalculés dans la ligne Main (TestSet) en base
+    // UNIQUEMENT si tous les scénarios sont présents (pas de filtre Failed Only)
+    if (!$onlyFailed && !empty($scenarios) && !empty($testset['AutoID'])) {
+        try {
+            $updTestset = $pdo->prepare("
+                UPDATE `$tableName`
+                SET `TearDownPassed`  = :passed,
+                    `TearDownWarning` = :flaky,
+                    `TearDownFailed`  = :failed
+                WHERE AutoID = :autoID
+            ");
+            $updTestset->execute([
+                ':passed' => $calcPassed,
+                ':flaky'  => $calcFlaky,
+                ':failed' => $calcFailed,
+                ':autoID' => $testset['AutoID'],
+            ]);
+        } catch (Exception $e) {
+            error_log("details.php update testset stats error: " . $e->getMessage());
+        }
     }
     
     usort($scenarios, function($a, $b) {
@@ -282,7 +326,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                         </tr>
                         <?php else: ?>
                             <?php foreach ($scenarios as $scenario): ?>
-                            <tr data-autoid="<?php echo $scenario['AutoID']; ?>" data-failed="<?php echo $scenario['TearDownFailed'] ?? 0; ?>" data-warning="<?php echo $scenario['TearDownWarning'] ?? 0; ?>">
+                            <tr data-original-result="<?php echo ($scenario['TearDownFailed'] > 0) ? 'Failed' : (($scenario['TearDownWarning'] > 0) ? 'Flaky' : 'Passed');?>" data-autoid="<?php echo $scenario['AutoID']; ?>" data-failed="<?php echo $scenario['TearDownFailed'] ?? 0; ?>" data-warning="<?php echo $scenario['TearDownWarning'] ?? 0; ?>">
                                 <!-- FeatureTag -->
                                 <td data-sort-value="<?php echo htmlspecialchars($scenario['tag'] ?? '-'); ?>">
                                     <small><?php echo htmlspecialchars($scenario['tag'] ?? '-'); ?></small>
@@ -309,7 +353,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                 <td class="result-cell" data-sort-value="<?php 
                                     // Valeur pour le tri
                                     if ($scenario['checked'] ?? 0) {
-                                        echo 'flaky';
+                                        echo 'passed';
                                     } elseif ($scenario['TearDownFailed'] > 0) {
                                         echo 'failed';
                                     } else {
@@ -317,9 +361,9 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     }
                                 ?>">
                                     <?php 
-                                    // Si Validated est coché (checked = 1), afficher Flaky
+                                    // Si Validated est coché (checked = 1), afficher Passed
                                     if ($scenario['checked'] ?? 0) {
-                                        echo '<span class="result-badge result-flaky">⚠️ Flaky</span>';
+                                        echo '<span class="result-badge result-passed">✅ Passed</span>';
                                     } else {
                                         // Sinon, afficher le résultat réel
                                         if ($scenario['TearDownFailed'] > 0) {
