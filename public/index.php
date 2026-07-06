@@ -181,10 +181,16 @@ try {
             
             // Filter by Team tag
             if (!empty($teamTag)) {
-                $currentTeamTag = $testset['teamtag'] ?? '';
-                // Normaliser les valeurs vides/0/1 à @team_sqs
-                if (empty($currentTeamTag) || $currentTeamTag === '0' || $currentTeamTag === '1') {
-                    $currentTeamTag = '';
+                $jparam = $testset['JParam'] ?? '';
+                // @nightly et @smokeTest : teamtag toujours @team_sqs (ignorer les teamtags des scénarios)
+                if (stripos($jparam, '@nightly') !== false || stripos($jparam, '@smokeTest') !== false) {
+                    $currentTeamTag = '@team_sqs';
+                } else {
+                    $currentTeamTag = $testset['teamtag'] ?? '';
+                    // Normaliser les valeurs vides/0/1 à @team_sqs
+                    if (empty($currentTeamTag) || $currentTeamTag === '0' || $currentTeamTag === '1') {
+                        $currentTeamTag = '';
+                    }
                 }
                 if ($currentTeamTag !== $teamTag) {
                     return false;
@@ -278,6 +284,11 @@ if ($isGwDesktop) {
             $testTypesForProduct[] = $fb;
         }
     }
+	
+	// Ajouter la branche feature (gW Web) si absente
+    if (!$isSmartWe && !in_array('web_feat', $testTypesForProduct)) {
+        $testTypesForProduct[] = 'web_feat';
+    }
 }
 
 // Pour SmartWe, créer un mapping label simplifié → testType réel
@@ -292,10 +303,11 @@ if ($isSmartWe) {
     // Forcer rc_x17 et hf_x17
     $smartWeMapping['rc'] = 'rc_x17';
     $smartWeMapping['hf'] = 'hf_x17';
+	$smartWeMapping['feature'] = 'we_feat';
     
     // Réordonner: dev, rc, hf
     $ordered = [];
-    foreach (['dev', 'rc', 'hf'] as $branch) {
+    foreach (['dev', 'rc', 'hf', 'feature'] as $branch) {
         if (isset($smartWeMapping[$branch])) {
             $ordered[$branch] = $smartWeMapping[$branch];
         }
@@ -907,6 +919,12 @@ if (empty($testTypesForProduct)) {
             
             updateThemeButton();
             
+			requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    document.body.classList.add('theme-ready');
+                });
+            });
+
             // GESTION CENTRALISÉE DES FILTRES
             ['product', 'testtype', 'teamtag'].forEach(function(id) {
                 const el = document.getElementById(id);
@@ -981,11 +999,14 @@ if (empty($testTypesForProduct)) {
             if (isDarkMode) {
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('logg-theme', 'light');
             } else {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
-            }
-            
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('logg-theme', 'dark');
+            }            
             updateThemeButton();
             savePreferences();
         }

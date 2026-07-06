@@ -60,12 +60,12 @@ try {
               WHERE JJob = :jjob 
               AND JParam = :jparam 
               AND TestLogTyp = 'Single'
-              ORDER BY RunDate DESC";
+              ORDER BY AutoID DESC";
     
     $stmt = $pdo->prepare($query);
     $stmt->bindValue(':jjob', $testset['JJob'], PDO::PARAM_STR);
     $stmt->bindValue(':jparam', $testset['JParam'], PDO::PARAM_STR);
-    $stmt->execute();
+	$stmt->execute();
     
     // Group scenarios by ScenarioName (TCProj) and keep latest
     $scenarioMap = [];
@@ -88,8 +88,8 @@ try {
         // Garder aussi les clés originales pour la compatibilité
         $normalizedScenario = array_merge($scenario, $normalizedScenario);
         
-        // Keep only latest execution of each scenario
-        if (!isset($scenarioMap[$scenarioName]) || strtotime($scenario['RunDate'] ?? 0) > strtotime($scenarioMap[$scenarioName]['RunDate'] ?? 0)) {
+        // Keep only latest execution of each scenario (par AutoID le plus grand = le plus récent)
+        if (!isset($scenarioMap[$scenarioName]) || ($scenario['AutoID'] ?? 0) > ($scenarioMap[$scenarioName]['AutoID'] ?? 0)) {
             $scenarioMap[$scenarioName] = $normalizedScenario;
         }
     }
@@ -521,6 +521,13 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             }
             
             updateThemeButton();
+			
+			requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    document.body.classList.add('theme-ready');
+                });
+            });
+
             setTimeout(updateStickyPositions, 100);
             
             // Restaurer la préférence "All Scenarios / Failed Only" depuis localStorage
@@ -641,15 +648,18 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 // Passer en mode clair
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
-                savePreferences('light', textSizeSlider.value);
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('logg-theme', 'light');
             } else {
                 // Passer en mode sombre
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
-                savePreferences('dark', textSizeSlider.value);
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('logg-theme', 'dark');
             }
             
             updateThemeButton();
+            savePreferences();
         }
         
         // Apply text size changes
@@ -693,14 +703,16 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             const cached = localStorage.getItem('logg-prefs');
             const prefs = cached ? JSON.parse(cached) : {};
             
-            // Apply theme
-            const theme = prefs.theme || 'light';
+            // Apply theme - lire logg-theme (clé partagée entre toutes les pages)
+            const theme = localStorage.getItem('logg-theme') || prefs.theme || 'light';
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
+                document.documentElement.setAttribute('data-theme', 'dark');
             } else {
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
+                document.documentElement.setAttribute('data-theme', 'light');
             }
             updateThemeButton();
             

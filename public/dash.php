@@ -20,8 +20,7 @@
 		.tg .testfail{background-color:#FFCCC9;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
 		.tg .testwarn{background-color:#FFE787;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
 		.tg .testok{background-color:#4CFF00;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
-		.tg .analyse{background-color:#FFFFFF;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
-
+		
 		.tg .tg-simple1{border-color:black;color:#808080;text-align:center;vertical-align:center}
 		.tg .tg-simple{border-color:black;font-weight:bold;text-align:center;vertical-align:center}
 
@@ -148,18 +147,6 @@
 		echo "<td class=".$color."><a href=\"".$urlWithFilter."\" style=\"display:block;\">".$failed."</a></td>";
 	}
 	
-	function generateAnalyseCell($url, $analyse) {
-		$color = "analyse";		
-		if ($analyse > 0)
-		{
-			echo "<td class=\"tg-warn\">".$analyse."</td>";			
-		}
-		else {
-			echo "<td class=\"tg-green\" ><center>0</center></td>";	
-		}
-		
-	}
-			
 	function readLastRunResults($table) {	
 		global $pdo;
 		$sql="SELECT * FROM `".$table."_daily` ORDER BY `index` DESC LIMIT 1";
@@ -167,14 +154,12 @@
 		
 		$passed="";
 		$failed="";
-		$analyse="";
 		
 		while ($row = $results->fetch(PDO::FETCH_ASSOC)) {
 			$passed=$row["passed"];
-			$failed=$row["failed"];
-			$analyse=$row["analyse"];
+			$failed=$row["failed"];			
 		}
-		return[$passed,$failed,$analyse];
+		return[$passed,$failed];
 	}
 
 	function getLastResults($table, $testType, $product, $job, $Branch) {
@@ -185,6 +170,8 @@
 				  WHERE ((l1.JJob = 'Autotests-$product-$job' 
 				  AND l1.Testtype = '$testType' AND l1.TestLogTyp = 'Main' AND l2.AutoID is NULL)) 
 				  ORDER BY l1.RunDate DESC, l1.JBuild DESC";
+
+		//echo $query."<br>";
 		
 		$stmt = $pdo->query($query);
 		$sqlTestsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -192,36 +179,16 @@
 		if (!empty($sqlTestsList)) {
 			$passed = 0;
 			$failed = 0;
-			$analyse = 0;
-			foreach ($sqlTestsList as $row) {	
-				
-				if($row["checked"] == "1"){
-					$passed += intval($row["TearDownPassed"]) + intval($row["TearDownWarning"]) + intval($row["TearDownFailed"]);				
-				}
-				else{
-					$passed += intval($row["TearDownPassed"]) + intval($row["TearDownWarning"]);
-					$failed += intval($row["TearDownFailed"]);
-				}		
 			
-				
-				//Check if failed with empty notes
-				if(intval($row["TearDownFailed"]) > 0 && $row["checked"] <> "1")
-				{
-					//Read Notes
-					$notesql="SELECT testnotiz FROM `".$table."_tags` WHERE JParam='".$row["JParam"]."'";			
-					$notestmt = $pdo->query($notesql);
-					$noterows = $notestmt->fetchAll(PDO::FETCH_ASSOC);
-					if (empty($noterows))
-					{
-						$analyse += intval($row["TearDownFailed"]);
-					}
-				}			
+			foreach ($sqlTestsList as $row) {
+				$passed += intval($row["TearDownPassed"]) + intval($row["TearDownWarning"]);
+				$failed += intval($row["TearDownFailed"]);
 			}
 					
 			$total = $passed + $failed;
 			$failedPercentage = round($failed / $total * 100, 0);
 			
-			$runn="https://sqs-sel-cent1.cas-software.dev/logg/public/dailyStats.php?passed=".$passed."&failed=".$failed."&percent=".$failedPercentage."&Branch=".urlencode($Branch)."&table=".$table."_daily&analyse=".$analyse;
+			$runn="https://sqs-sel-cent1.cas-software.dev/logg/public/dailyStats.php?passed=".$passed."&failed=".$failed."&percent=".$failedPercentage."&Branch=".urlencode($Branch)."&table=".$table."_daily";
 			$streamContext = stream_context_create([
 				'ssl' => [
 				'verify_peer'      => false,
@@ -232,7 +199,7 @@
 			
 			//echo $runn."<br>";					
 			file_get_contents($runn, false, $streamContext);
-			return [$passed,$failed,$analyse];
+			return [$passed,$failed];
 		}
 		return null;
 	}			
@@ -274,26 +241,26 @@
 	$Web2HFVersion = str_replace("27.", "x17.", $Web2HFVersion);
 	
 	if(isItTimeToGetLastRuns() || $refresh == "true"){	
-		[$we_dev_passed,$we_dev_failed,$we_dev_analyse] = getLastResults("we_dev","we_dev","We","Grid",$WeDevVersion);
-		[$we_rc_passed,$we_rc_failed,$we_rc_analyse] = getLastResults("we_rc","we_rc","We","Grid",$WeRCVersion);
-		[$we_hf_passed,$we_hf_failed,$we_hf_analyse] = getLastResults("we_hf","we_hf","We","Grid",$WeHFVersion);
+		[$we_dev_passed,$we_dev_failed] = getLastResults("we_dev","we_dev","We","Grid",$WeDevVersion);
+		[$we_rc_passed,$we_rc_failed] = getLastResults("we_rc","we_rc","We","Grid",$WeRCVersion);
+		[$we_hf_passed,$we_hf_failed] = getLastResults("we_hf","we_hf","We","Grid",$WeHFVersion);
 
-		[$web_dev14_passed,$web_dev14_failed,$web_dev14_analyse] = getLastResults("x18_dev","dev_x18","Web","Grid",$WebDevVersion);
-		//[$web_rc14_passed,$web_rc14_failed,$web_rc14_analyse] = getLastResults("x18_rc","rc_x18","Web","Grid",$WebRCVersion);
-		//[$web_hf14_passed,$web_hf14_failed,$web_hf14_analyse] = getLastResults("x18_hf","hf_x18","Web","Grid",$WebHFVersion);
+		[$web_dev14_passed,$web_dev14_failed] = getLastResults("x18_dev","dev_x18","Web","Grid",$WebDevVersion);
+		//[$web_rc14_passed,$web_rc14_failed] = getLastResults("x18_rc","rc_x18","Web","Grid",$WebRCVersion);
+		//[$web_hf14_passed,$web_hf14_failed] = getLastResults("x18_hf","hf_x18","Web","Grid",$WebHFVersion);
 		
-		[$web_dev13_passed,$web_dev13_failed,$web_dev13_analyse] = getLastResults("x17_dev","dev_x17","Web","Grid",$Web2DevVersion);
-		[$web_rc13_passed,$web_rc13_failed,$web_rc13_analyse] = getLastResults("x17_rc","rc_x17","Web","Grid",$Web2RCVersion);
-		[$web_hf13_passed,$web_hf13_failed,$web_hf13_analyse] = getLastResults("x17_hf","hf_x17","Web","Grid",$Web2HFVersion);
+		[$web_dev13_passed,$web_dev13_failed] = getLastResults("x17_dev","dev_x17","Web","Grid",$Web2DevVersion);
+		[$web_rc13_passed,$web_rc13_failed] = getLastResults("x17_rc","rc_x17","Web","Grid",$Web2RCVersion);
+		[$web_hf13_passed,$web_hf13_failed] = getLastResults("x17_hf","hf_x17","Web","Grid",$Web2HFVersion);
 		
-		[$web_dev12_passed,$web_dev12_failed,$web_dev12_analyse] = getLastResults("x16_dev","dev_x16","Web","Grid",$Web1DevVersion);
-		[$web_rc12_passed,$web_rc12_failed,$web_rc12_analyse] = getLastResults("x16_rc","rc_x16","Web","Grid",$Web1RCVersion);
-		[$web_hf12_passed,$web_hf12_failed,$web_hf12_analyse] = getLastResults("x16_hf","hf_x16","Web","Grid",$Web1HFVersion);
+		[$web_dev12_passed,$web_dev12_failed] = getLastResults("x16_dev","dev_x16","Web","Grid",$Web1DevVersion);
+		[$web_rc12_passed,$web_rc12_failed] = getLastResults("x16_rc","rc_x16","Web","Grid",$Web1RCVersion);
+		[$web_hf12_passed,$web_hf12_failed] = getLastResults("x16_hf","hf_x16","Web","Grid",$Web1HFVersion);
 		
-		/*[$gw_x15hf_passed,$gw_x15hf_failed,$gw_x15hf_analyse] = getLastResults("x15_gwhf","hf_x15","x15","gW",$gWHFVersion);
-		[$gw_x15rc_passed,$gw_x15rc_failed,$gw_x15rc_analyse] = getLastResults("x15_gwrc","rc_x15","x15","gW",$gWRCVersion);
-		[$gw_x16hf_passed,$gw_x16hf_failed,$gw_x16hf_analyse] = getLastResults("x16_gwhf","hf_x16","x16","gW",$gW1HFVersion);
-		[$gw_x16rc_passed,$gw_x16rc_failed,$gw_x16rc_analyse] = getLastResults("x16_gwrc","rc_x16","x16","gW",$gW1RCVersion);
+		/*[$gw_x15hf_passed,$gw_x15hf_failed] = getLastResults("x15_gwhf","hf_x15","x15","gW",$gWHFVersion);
+		[$gw_x15rc_passed,$gw_x15rc_failed] = getLastResults("x15_gwrc","rc_x15","x15","gW",$gWRCVersion);
+		[$gw_x16hf_passed,$gw_x16hf_failed] = getLastResults("x16_gwhf","hf_x16","x16","gW",$gW1HFVersion);
+		[$gw_x16rc_passed,$gw_x16rc_failed] = getLastResults("x16_gwrc","rc_x16","x16","gW",$gW1RCVersion);
 		*/
 		// Pas besoin de rafraîchir, on utilise directement la base de données
 		// $streamContext = stream_context_create([
@@ -305,7 +272,7 @@
 		// ]);
 		// 
 		// $url="https://sqs-sel-cent1.cas-software.dev/logg/public/dash.php";
-		// $content = file_get_contents($url,false, $streamContext);	
+		// $content = file_get_contents($url,false, $streamContext);
 		// //header("Location: " . $url);
 	}	
 	?>
@@ -330,30 +297,30 @@
 		<tbody>
 			<?php			
 			// Get Values from last backup (Quick)
-			[$we_dev_passed,$we_dev_failed,$we_dev_analyse] = readLastRunResults("we_dev");
-			[$we_rc_passed,$we_rc_failed,$we_rc_analyse] = readLastRunResults("we_rc");
-			[$we_hf_passed,$we_hf_failed,$we_hf_analyse] = readLastRunResults("we_hf");
+			[$we_dev_passed,$we_dev_failed] = readLastRunResults("we_dev");
+			[$we_rc_passed,$we_rc_failed] = readLastRunResults("we_rc");
+			[$we_hf_passed,$we_hf_failed] = readLastRunResults("we_hf");
 
 			
-			[$web_dev12_passed,$web_dev12_failed,$web_dev12_analyse] = readLastRunResults("x16_dev");
-			[$web_rc12_passed,$web_rc12_failed,$web_rc12_analyse] = readLastRunResults("x16_rc");
-			[$web_hf12_passed,$web_hf12_failed,$web_hf12_analyse] = readLastRunResults("x16_hf");
+			[$web_dev12_passed,$web_dev12_failed] = readLastRunResults("x16_dev");
+			[$web_rc12_passed,$web_rc12_failed] = readLastRunResults("x16_rc");
+			[$web_hf12_passed,$web_hf12_failed] = readLastRunResults("x16_hf");
 			
-			[$web_dev13_passed,$web_dev13_failed,$web_dev13_analyse] = readLastRunResults("x17_dev");
-			[$web_rc13_passed,$web_rc13_failed,$web_rc13_analyse] = readLastRunResults("x17_rc");
-			[$web_hf13_passed,$web_hf13_failed,$web_hf13_analyse] = readLastRunResults("x17_hf");
+			[$web_dev13_passed,$web_dev13_failed] = readLastRunResults("x17_dev");
+			[$web_rc13_passed,$web_rc13_failed] = readLastRunResults("x17_rc");
+			[$web_hf13_passed,$web_hf13_failed] = readLastRunResults("x17_hf");
 			
-			//[$web_dev14_passed,$web_dev14_failed,$web_dev14_analyse] = readLastRunResults("x18_dev");
-			//[$web_rc14_passed,$web_rc14_failed,$web_rc14_analyse] = readLastRunResults("x18_rc");
-			[$web_dev14_passed,$web_dev14_failed,$web_dev14_analyse] = readLastRunResults("x18_dev");
+			//[$web_dev14_passed,$web_dev14_failed] = readLastRunResults("x18_dev");
+			//[$web_rc14_passed,$web_rc14_failed] = readLastRunResults("x18_rc");
+			[$web_dev14_passed,$web_dev14_failed] = readLastRunResults("x18_dev");
 			
-			/*[$gw_x15rc_passed,$gw_x15rc_failed,$gw_x15rc_analyse] = readLastRunResults("x15_gwrc");
-			[$gw_x15hf_passed,$gw_x15hf_failed,$gw_x15hf_analyse] = readLastRunResults("x15_gwhf");
-			[$gw_x16rc_passed,$gw_x16rc_failed,$gw_x16rc_analyse] = readLastRunResults("x16_gwrc");
-			[$gw_x16hf_passed,$gw_x16hf_failed,$gw_x16hf_analyse] = readLastRunResults("x16_gwhf");
+			/*[$gw_x15rc_passed,$gw_x15rc_failed] = readLastRunResults("x15_gwrc");
+			[$gw_x15hf_passed,$gw_x15hf_failed] = readLastRunResults("x15_gwhf");
+			[$gw_x16rc_passed,$gw_x16rc_failed] = readLastRunResults("x16_gwrc");
+			[$gw_x16hf_passed,$gw_x16hf_failed] = readLastRunResults("x16_gwhf");
 			*/
 			//Write results in table
-			for ($row = 1; $row <= 4; $row++) {
+			for ($row = 1; $row <= 3; $row++) {
 				echo '<tr>';
 					if ($row == 1) {
 						echo "<td class=\"tg-simple\" rowspan='1' >Branch</td>";
@@ -416,28 +383,7 @@
 						echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";
 						echo "<td class=\"tg-disabled\">0</td>";*/
-					}
-							
-					if ($row == 4) {
-						//To check
-						echo "<td class=\"tg-warn\" rowspan='1' >To check</td>";
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=hf_x17&TestBrowser=chrome", $we_hf_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x17&TestBrowser=chrome", $we_rc_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=dev_x18&TestBrowser=chrome", $we_dev_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x16&TestBrowser=chrome", $web_hf12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x16&TestBrowser=chrome", $web_rc12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x16&TestBrowser=chrome", $web_dev12_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x17&TestBrowser=chrome", $web_hf13_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x17&TestBrowser=chrome", $web_rc13_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x17&TestBrowser=chrome", $web_dev13_analyse);
-						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=hf_x18&TestBrowser=chrome", $web_hf14_analyse);
-						//generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=rc_x18&TestBrowser=chrome", $web_rc14_analyse);
-						generateAnalyseCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=dev_x18&TestBrowser=chrome", $web_dev14_analyse);
-						/*echo "<td class=\"tg-disabled\">0</td>";
-						echo "<td class=\"tg-disabled\">0</td>";
-						echo "<td class=\"tg-disabled\">0</td>";
-						echo "<td class=\"tg-disabled\">0</td>";	*/					
-					}								
+					}																				
 				echo '</tr>';				
 			}
 			?>

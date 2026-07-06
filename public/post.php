@@ -11,11 +11,11 @@
 	/**
 	 * POST.PHP
 	 * Enregistre les résultats de tests envoyés par Jenkins/TestComplete
-	 * Version adaptée pour LOGG (PDO via config.php)
-	 *
-	 * Note: les paramètres GET arrivent souvent déjà entourés de quotes simples
-	 *       (ex: Product='gWWebSel'). On les nettoie puis on utilise des
-	 *       requêtes préparées (sécurité + cohérence avec le reste du projet).
+	 * Version PDO (config.php) avec support retry Maven :
+	 * - Single : UPDATE si JJob+JParam+Build+TCProj existe déjà (retry), INSERT sinon
+	 * - Main   : DELETE restreint au Main + INSERT (historique Single préservé)
+	 * - Historique préservé : chaque JParam distinct = exécution distincte
+																				  
 	 */
 
 	require_once '../config/config.php';
@@ -24,7 +24,7 @@
 	function unquote($value) {
 		if ($value === null) return '';
 		$value = trim($value);
-		// Retirer une paire de quotes simples englobantes
+													
 		if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
 			$value = substr($value, 1, -1);
 		}
@@ -66,11 +66,7 @@
 	if ($isWebOrWe && in_array($Version, $webVersions)) {
 		$TCProj = urldecode($TCProj);
 	}
-	if ($isWebOrWe && $Version === 'x10') {
-		$TCProj = trim($TCProj, '"');
-		$TCProj = trim($TCProj, "'");
-	}
-
+	
 	// gWClient : pas de browser
 	if ($Product === 'gWClient') {
 		$Browser = '';
@@ -108,51 +104,130 @@
 	}
 
 	try {
-		// Pour gWClient : pas de tag/teamtag (colonnes absentes)
+														   
 		if ($Product === 'gWClient') {
-			$sql = "INSERT INTO `$LogVersion`
-				(`JJob`, `JBuild`, `JParam`, `TCProj`, `Version`, `Product`, `gWVersion`, `TestNode`, `Build`, `TearDownFailed`, `TearDownCanceled`, `TearDownWarning`, `TearDownPassed`, `RunDate`, `RunDuration`, `LogLink`, `TestLogTyp`, `Testtype`, `Browser`)
-				VALUES
-				(:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build, :failed, :canceled, :warning, :passed, :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser)";
-
-			$stmt = $pdo->prepare($sql);
+			// gWClient : INSERT direct (pas de retry géré, pas de tag/teamtag)
+			$stmt = $pdo->prepare(
+				"INSERT INTO `$LogVersion`
+				 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
+				  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
+				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser)
+				 VALUES
+				 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
+				  :failed, :canceled, :warning, :passed,
+				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser)"
+			);
 			$stmt->execute([
-				':jjob' => $JJob, ':jbuild' => $JBuild, ':jparam' => $JParam,
-				':tcproj' => $TCProj, ':version' => $Version, ':product' => $Product,
-				':gwversion' => $gWVersion, ':testnode' => $TestNode, ':build' => $Build,
-				':failed' => $TearDownFailed, ':canceled' => $TearDownCanceled,
-				':warning' => $TearDownWarning, ':passed' => $TearDownPassed,
-				':rundate' => $RunDate, ':runduration' => $RunDuration,
-				':loglink' => $LogLink, ':testlogtyp' => $TestLogTyp,
-				':testtype' => $Testtype, ':browser' => $Browser
+				':jjob'      => $JJob,      ':jbuild'     => $JBuild,    ':jparam'    => $JParam,
+				':tcproj'    => $TCProj,    ':version'    => $Version,   ':product'   => $Product,
+				':gwversion' => $gWVersion, ':testnode'   => $TestNode,  ':build'     => $Build,
+				':failed'    => $TearDownFailed,   ':canceled'   => $TearDownCanceled,
+				':warning'   => $TearDownWarning,  ':passed'     => $TearDownPassed,
+				':rundate'   => $RunDate,   ':runduration' => $RunDuration,
+				':loglink'   => $LogLink,   ':testlogtyp' => $TestLogTyp,
+				':testtype'  => $Testtype,  ':browser'    => $Browser,
 			]);
+
+																				 
+		} elseif ($TestLogTyp === 'Single') {
+			// Scénario individuel : UPDATE si même exécution (retry), INSERT sinon
+			// Clé d'unicité : JJob + JParam + Build + TCProj
+			$checkStmt = $pdo->prepare(
+				"SELECT AutoID FROM `$LogVersion`
+				 WHERE JJob = :jjob AND JParam = :jparam AND Build = :build
+				 AND TCProj = :tcproj AND TestLogTyp = 'Single'
+				 LIMIT 1"
+			);
+			$checkStmt->execute([
+				':jjob'   => $JJob,
+				':jparam' => $JParam,
+				':build'  => $Build,
+				':tcproj' => $TCProj,
+			]);
+			$existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+			if ($existing) {
+				// Retry : mettre à jour uniquement les colonnes résultat
+				$updStmt = $pdo->prepare(
+					"UPDATE `$LogVersion`
+					 SET TearDownFailed   = :failed,
+					     TearDownCanceled = :canceled,
+					     TearDownWarning  = :warning,
+					     TearDownPassed   = :passed,
+					     RunDate          = :rundate,
+					     RunDuration      = :runduration,
+					     LogLink          = :loglink
+					 WHERE AutoID = :autoid"
+				);
+				$updStmt->execute([
+					':failed'      => $TearDownFailed,
+					':canceled'    => $TearDownCanceled,
+					':warning'     => $TearDownWarning,
+					':passed'      => $TearDownPassed,
+					':rundate'     => $RunDate,
+					':runduration' => $RunDuration,
+					':loglink'     => $LogLink,
+					':autoid'      => $existing['AutoID'],
+				]);
+			} else {
+				// Nouveau run : INSERT normal
+				$stmt = $pdo->prepare(
+					"INSERT INTO `$LogVersion`
+					 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
+					  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
+					  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag)
+					 VALUES
+					 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
+					  :failed, :canceled, :warning, :passed,
+					  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag)"
+				);
+				$stmt->execute([
+					':jjob'      => $JJob,      ':jbuild'      => $JBuild,    ':jparam'    => $JParam,
+					':tcproj'    => $TCProj,    ':version'     => $Version,   ':product'   => $Product,
+					':gwversion' => $gWVersion, ':testnode'    => $TestNode,  ':build'     => $Build,
+					':failed'    => $TearDownFailed,   ':canceled'    => $TearDownCanceled,
+					':warning'   => $TearDownWarning,  ':passed'      => $TearDownPassed,
+					':rundate'   => $RunDate,   ':runduration' => $RunDuration,
+					':loglink'   => $LogLink,   ':testlogtyp'  => $TestLogTyp,
+					':testtype'  => $Testtype,  ':browser'     => $Browser,
+					':tag'       => $tag,       ':teamtag'     => $teamtag,
+				]);
+			}
+
 		} else {
-			// Web/SmartWe : supprimer les anciens runs pour le même Build, puis insérer
-			$sqlDelete = "DELETE FROM `$LogVersion` WHERE TCProj = :tcproj AND Build = :build";
-			$stmtDel = $pdo->prepare($sqlDelete);
+			// TestLogTyp = Main : DELETE restreint au Main + INSERT
+			// (le DELETE original sans TestLogTyp écrasait aussi les Single — corrigé)
+			$stmtDel = $pdo->prepare(
+				"DELETE FROM `$LogVersion`
+				 WHERE TCProj = :tcproj AND Build = :build AND TestLogTyp = 'Main'"
+			);
 			$stmtDel->execute([':tcproj' => $TCProj, ':build' => $Build]);
 
-			$sql = "INSERT INTO `$LogVersion`
-				(`JJob`, `JBuild`, `JParam`, `TCProj`, `Version`, `Product`, `gWVersion`, `TestNode`, `Build`, `TearDownFailed`, `TearDownCanceled`, `TearDownWarning`, `TearDownPassed`, `RunDate`, `RunDuration`, `LogLink`, `TestLogTyp`, `Testtype`, `Browser`, `tag`, `teamtag`)
-				VALUES
-				(:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build, :failed, :canceled, :warning, :passed, :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag)";
-
-			$stmt = $pdo->prepare($sql);
+			$stmt = $pdo->prepare(
+				"INSERT INTO `$LogVersion`
+				 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
+				  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
+				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag)
+				 VALUES
+				 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
+				  :failed, :canceled, :warning, :passed,
+				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag)"
+			);
 			$stmt->execute([
-				':jjob' => $JJob, ':jbuild' => $JBuild, ':jparam' => $JParam,
-				':tcproj' => $TCProj, ':version' => $Version, ':product' => $Product,
-				':gwversion' => $gWVersion, ':testnode' => $TestNode, ':build' => $Build,
-				':failed' => $TearDownFailed, ':canceled' => $TearDownCanceled,
-				':warning' => $TearDownWarning, ':passed' => $TearDownPassed,
-				':rundate' => $RunDate, ':runduration' => $RunDuration,
-				':loglink' => $LogLink, ':testlogtyp' => $TestLogTyp,
-				':testtype' => $Testtype, ':browser' => $Browser,
-				':tag' => $tag, ':teamtag' => $teamtag
+				':jjob'      => $JJob,      ':jbuild'      => $JBuild,    ':jparam'    => $JParam,
+				':tcproj'    => $TCProj,    ':version'     => $Version,   ':product'   => $Product,
+				':gwversion' => $gWVersion, ':testnode'    => $TestNode,  ':build'     => $Build,
+				':failed'    => $TearDownFailed,   ':canceled'    => $TearDownCanceled,
+				':warning'   => $TearDownWarning,  ':passed'      => $TearDownPassed,
+				':rundate'   => $RunDate,   ':runduration' => $RunDuration,
+				':loglink'   => $LogLink,   ':testlogtyp'  => $TestLogTyp,
+				':testtype'  => $Testtype,  ':browser'     => $Browser,
+				':tag'       => $tag,       ':teamtag'     => $teamtag,
 			]);
 		}
 
-		// Succès (silencieux, comme l'original)
-		//echo "New record added successfully";
+		// Succès (silencieux)
+		// echo "New record added successfully";
 
 	} catch (PDOException $e) {
 		echo "Error: " . htmlspecialchars($e->getMessage());

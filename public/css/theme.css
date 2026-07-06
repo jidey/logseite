@@ -18,6 +18,15 @@
     --link-color: #007bff;
 }
 
+html[data-theme="dark"] {
+    background: #1a1a1a;
+}
+html[data-theme="dark"] body {
+    background: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"],
 body.dark-mode {
     --bg-primary: #1a1a1a;
     --bg-secondary: #2d2d2d;
@@ -36,6 +45,10 @@ body.dark-mode {
 body {
     background: var(--bg-primary) !important;
     color: var(--text-primary) !important;
+}
+
+/* La transition ne s'active qu'après le premier rendu (évite le fondu blanc→noir au load) */
+body.theme-ready {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 

@@ -1,36 +1,41 @@
 <?php
-include("inc/db_connect.php");
+require_once __DIR__ . '/../config/config.php';
 
-if (isset($_GET['passed'])) 
-{$passed = $_GET['passed'];}
-else{$passed = "";}
-if (isset($_GET['failed'])) 
-{$failed = $_GET['failed'];}
-else{$failed = "";}
-if (isset($_GET['percent'])) 
-{$percent = $_GET['percent'];}
-else{$percent = "";}
-if (isset($_GET['Branch'])) 
-{$Branch = $_GET['Branch'];}
-else{$Branch = "";}
-if (isset($_GET['table'])) 
-{$table = $_GET['table'];}
-else{$table = "";}
-if (isset($_GET['analyse'])) 
-{$analyse = $_GET['analyse'];}
-else{$analyse = "";}
+$passed  = isset($_GET['passed'])  ? $_GET['passed']  : '';
+$failed  = isset($_GET['failed'])  ? $_GET['failed']  : '';
+$percent = isset($_GET['percent']) ? $_GET['percent'] : '';
+$Branch  = isset($_GET['Branch'])  ? $_GET['Branch']  : '';
+$table   = isset($_GET['table'])   ? $_GET['table']   : '';
+$analyse = isset($_GET['analyse']) ? $_GET['analyse'] : '';
 
+// Valider le nom de table (sécurité : il ne peut pas être paramétré dans une requête préparée)
+if (!preg_match('/^[a-z0-9_]+$/i', $table)) {
+    echo "Error: invalid table name";
+    exit;
+}
 
-$sql="INSERT INTO `".$table."`(`passed`, `failed`, `percent`, `Branch`, `analyse`) VALUES ('".$passed."','".$failed."','".$percent."','".$Branch."','".$analyse."')";
+if (!isset($pdo)) {
+    echo "Error: connexion PDO non disponible";
+    exit;
+}
 
-//echo $sql."<br>";
+$sql = "INSERT INTO `" . $table . "` (`passed`, `failed`, `percent`, `Branch`, `analyse`)
+        VALUES (:passed, :failed, :percent, :branch, :analyse)";
 
-if ($conn->query($sql) === TRUE) {
+echo htmlspecialchars($sql) . "<br>";
+
+try {
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':passed'  => $passed,
+        ':failed'  => $failed,
+        ':percent' => $percent,
+        ':branch'  => $Branch,
+        ':analyse' => $analyse,
+    ]);
     echo "New record added successfully";
-} 
-else {
-	echo "Error: " . $sql . "<br>" . $conn->error;
-}	
-$conn->close();
+} catch (PDOException $e) {
+    error_log("dailyStats.php error: " . $e->getMessage());
+    echo "Error: " . htmlspecialchars($e->getMessage());
+}
 ?>
-

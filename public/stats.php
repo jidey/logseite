@@ -3,6 +3,16 @@
 <head>
 <title>Autotests - Stats</title>
 <meta charset="utf-8">
+<!-- 1. Script inline : pose data-theme IMMÉDIATEMENT (anti-flash même en hard refresh) -->
+<script>
+	(function() {
+		try {
+			var t = localStorage.getItem('logg-theme');
+			var isDark = (t === 'dark') || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+			if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+		} catch(e) {}
+	})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Theme init (avant CSS pour éviter le flash) -->
 <script src="js/theme.js"></script>
@@ -11,6 +21,7 @@
 <link href="css/theme.css" rel="stylesheet">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
 </head>
 <body>
 <!-- Theme Toggle Button -->
@@ -36,8 +47,6 @@ $FilterResults = $_GET['Filter'] ?? 'no';
 $Versiontype  = $_GET['Versiontype'] ?? 'RC';
 $Testtype     = $_GET['Testtype'] ?? '';
 $TestBrowser  = $_GET['TestBrowser'] ?? 'chrome';
-
-echo "<img src=\"Titel.jpg\" style=\"width:250px;height:60px;\" align=\"right\">";
 
 // Calculer la version "courte" (ex: x17 depuis x17_dev), sauf pour SmartWe (we_*)
 if (substr($LogVersion, 0, 2) !== "we") {

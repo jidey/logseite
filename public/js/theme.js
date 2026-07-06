@@ -24,14 +24,14 @@
 
     // Appliquer la classe sur body une fois disponible
     function applyBodyClass() {
-        if (window.__loggIsDark) {
-            document.body.classList.add('dark-mode');
-            document.body.classList.remove('light-mode');
-        } else {
-            document.body.classList.add('light-mode');
-            document.body.classList.remove('dark-mode');
-        }
+        applyTheme(window.__loggIsDark);
         updateThemeButton();
+        // Activer les transitions APRÈS le premier rendu (évite le fondu blanc→noir au load)
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                document.body.classList.add('theme-ready');
+            });
+        });
     }
 
     // Mettre à jour le libellé du bouton
@@ -43,18 +43,27 @@
         btn.title = isDark ? 'Currently in Dark Mode' : 'Currently in Light Mode';
     };
 
-    // Basculer le thème
-    window.toggleTheme = function() {
-        const isDark = document.body.classList.contains('dark-mode');
+    // Appliquer un thème de façon cohérente (html + body)
+    function applyTheme(isDark) {
         if (isDark) {
-            document.body.classList.remove('dark-mode');
-            document.body.classList.add('light-mode');
-            localStorage.setItem('logg-theme', 'light');
-        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
             document.body.classList.add('dark-mode');
             document.body.classList.remove('light-mode');
-            localStorage.setItem('logg-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            document.body.classList.add('light-mode');
+            document.body.classList.remove('dark-mode');
         }
+        window.__loggIsDark = isDark;
+    }
+
+    // Basculer le thème (basé sur localStorage, source de vérité)
+    window.toggleTheme = function() {
+        const current = localStorage.getItem('logg-theme');
+        const isDarkNow = (current === 'dark');
+        const newTheme = isDarkNow ? 'light' : 'dark';
+        localStorage.setItem('logg-theme', newTheme);
+        applyTheme(newTheme === 'dark');
         updateThemeButton();
     };
 

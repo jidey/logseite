@@ -159,22 +159,32 @@ if ($execute) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
     <!-- Theme Init Script -->
     <script>
         (function() {
             const savedTheme = localStorage.getItem('logg-theme');
+            let isDark;
             if (savedTheme === 'dark') {
-                document.body.classList.add('dark-mode');
-                document.body.classList.remove('light-mode');
+                isDark = true;
             } else if (savedTheme === 'light') {
-                document.body.classList.add('light-mode');
-                document.body.classList.remove('dark-mode');
+                isDark = false;
             } else {
-                if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    document.body.classList.add('light-mode');
-                }
+                isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             }
+            // Poser data-theme sur <html> (existe déjà, pas de flash)
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            window.initialTheme = isDark ? 'dark' : 'light';
+            // Appliquer la classe sur body dès qu'il est disponible
+            document.addEventListener('DOMContentLoaded', function() {
+                if (isDark) {
+                    document.body.classList.add('dark-mode');
+                    document.body.classList.remove('light-mode');
+                } else {
+                    document.body.classList.add('light-mode');
+                    document.body.classList.remove('dark-mode');
+                }
+                if (typeof updateThemeButton === 'function') updateThemeButton();
+            });
         })();
     </script>
         <title><?php echo $pageTitle; ?> - LOGG</title>
@@ -197,6 +207,19 @@ if ($execute) {
                 --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             
+			html[data-theme="dark"] {
+                --bg-primary: #1a1a1a;
+                --bg-secondary: #2d2d2d;
+                --bg-tertiary: #3a3a3a;
+                --text-primary: #e4e4e4;
+                --text-secondary: #b0b0b0;
+                /* ... recopier EXACTEMENT les mêmes variables que body.dark-mode ... */
+            }
+            html[data-theme="dark"] body {
+                background: var(--bg-primary) !important;
+                color: var(--text-primary) !important;
+            }
+			
             body.dark-mode {
                 --bg-primary: #1a1a1a;
                 --bg-secondary: #2d2d2d;
@@ -368,12 +391,6 @@ if ($execute) {
     </head>
     <body>
         <!-- Header avec Theme Toggle -->
-        <div style="padding: 15px; text-align: right; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
-            <button id="themeToggle" class="btn btn-sm btn-outline-secondary" title="Toggle Dark/Light Mode" onclick="toggleTheme()">
-                🌙 Dark Mode
-            </button>
-        </div>
-        
         <div class="rerun-container">
             <div class="rerun-card">
                 <h2>🔄 <?php echo $pageTitle; ?></h2>
@@ -522,6 +539,13 @@ if ($execute) {
                 
                 updateThemeButton();
             }
+			
+			requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    document.body.classList.add('theme-ready');
+                });
+            });
+
         </script>
     </body>
     </html>

@@ -51,7 +51,11 @@ class TestLogRepository {
      * @throws Exception
      */
     public function getTableForTestType(string $testType, ?string $product = null): string {
-        // Vérifier que le testType existe
+        // Branches feature : le testType EST le nom de la table
+		if ($testType === 'we_feat' || $testType === 'web_feat') {
+			return $testType;
+		}
+		// Vérifier que le testType existe
         if (!isset($this->product_table_map[$testType])) {
             throw new Exception("Unknown test type: " . htmlspecialchars($testType));
         }
