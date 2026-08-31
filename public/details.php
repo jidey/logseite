@@ -10,14 +10,58 @@
 require_once '../config/config.php';
 require_once '../src/TestLogRepository.php';
 
+/**
+ * Get the deployed build from deployedVM folder
+ */
+function getDeployedBuild($testType, $product) {
+    $deployFile = null;
+    
+    // Detect product type
+    $isSmartWe = (strpos($product, 'weWebSel') !== false || strpos($product, 'weClient') !== false || 
+                  strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
+    
+    if ($isSmartWe) {
+        // SmartWe: testtype format is "dev_x18", "rc_x18", "hf_x18"
+        // Deploy file format: lastWewercDeploy.txt (lastWe + we + rc)
+        $parts = explode("_", $testType);
+        if (count($parts) == 2) {
+            $branch = $parts[0]; // dev, rc, hf
+            $suffix = "we" . strtolower($branch); // wedev, werc, wehf
+            $deployFile = __DIR__ . "/deployedVM/lastWe{$suffix}Deploy.txt";
+        }
+    } else {
+        // gWWebSel: testtype format is "rc_x17", "dev_x17", "hf_x17"
+        // Deploy file format: lastSelrc17Deploy.txt (branch + version)
+        $parts = explode("_", $testType);
+        if (count($parts) == 2) {
+            $branch = $parts[0];
+            $version = str_replace("x", "", $parts[1]);
+            $suffix = $branch . $version;
+            $deployFile = __DIR__ . "/deployedVM/lastSel{$suffix}Deploy.txt";
+        }
+    }
+    
+    // Read the deployed build file
+	if ($deployFile && file_exists($deployFile)) {
+		$content = trim(file_get_contents($deployFile));
+		// SmartWe: keep only the short hash (first 6 characters)
+		if ($isSmartWe) {
+			$content = substr($content, 0, 6);
+		}
+		return $content;
+	}
+    return null;
+}
+
 // Get parameters
 $testType = $_GET['Testtype'] ?? 'rc_x17';
 $product = $_GET['Product'] ?? 'gWWebSel';
 $autoID = $_GET['AutoID'] ?? null;
+$browser = $_GET['TestBrowser'] ?? 'chrome';
 $onlyFailed = isset($_GET['OnlyFailed']) && $_GET['OnlyFailed'] === '1';  // Show only failed scenarios
 
-// Normaliser le testType pour SmartWe (cohérent avec index.php)
-// SmartWe : rc → rc_x17, hf → hf_x17 (forcés), dev → garde sa version
+// Normalize the testType for SmartWe (consistent with index.php)
+// SmartWe: rc -> rc_x18, hf -> hf_x18, dev -> dev_x18
 $isSmartWe = (strpos($product, 'weWebSel') !== false || 
               strpos($product, 'weClient') !== false || 
               strpos($product, 'smartWe') !== false || 
@@ -25,11 +69,10 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = 'hf_x17';  // Forcer hf_x17
+        $testType = $LOGG_SMARTWE_HF;  // ex: hf_x18 (voir config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = 'rc_x17';  // Forcer rc_x17
+        $testType = $LOGG_SMARTWE_RC;  // ex: rc_x18 (voir config/versions_config.php)
     }
-    // dev garde sa version (dev_x18, etc.)
 }
 
 // Create a Repository instance
@@ -71,7 +114,7 @@ try {
     $scenarioMap = [];
     $allScenarios = $stmt->fetchAll();
     
-    // Debug: vérifier les colonnes disponibles
+    // Debug: check the available columns
     if (!empty($allScenarios)) {
         error_log("Available columns: " . implode(', ', array_keys($allScenarios[0])));
     }
@@ -79,16 +122,16 @@ try {
     foreach ($allScenarios as $scenario) {
         $scenarioName = $scenario['TCProj'] ?? 'Unknown'; // Using TCProj as Scenario name key
         
-        // Normaliser les colonnes - chercher teamtag indépendamment de la casse
+        // Normalize the columns - look up teamtag regardless of case
         $normalizedScenario = [];
         foreach ($scenario as $key => $value) {
             $lowerKey = strtolower($key);
             $normalizedScenario[$lowerKey] = $value;
         }
-        // Garder aussi les clés originales pour la compatibilité
+        // Also keep the original keys for compatibility
         $normalizedScenario = array_merge($scenario, $normalizedScenario);
         
-        // Keep only latest execution of each scenario (par AutoID le plus grand = le plus récent)
+        // Keep only latest execution of each scenario (highest AutoID = most recent)
         if (!isset($scenarioMap[$scenarioName]) || ($scenario['AutoID'] ?? 0) > ($scenarioMap[$scenarioName]['AutoID'] ?? 0)) {
             $scenarioMap[$scenarioName] = $normalizedScenario;
         }
@@ -97,38 +140,38 @@ try {
     // Convert to array and sort by date
     $scenarios = array_values($scenarioMap);
 
-    // Recalculer Passed / Flaky / Failed depuis les scénarios réels (AVANT tout filtre)
-    // Règle : un scénario validé (checked=1) compte comme Passed.
-    //         sinon -> Failed si TearDownFailed>0, Flaky si TearDownWarning>0, sinon Passed.
+    // Recalculate Passed / Flaky / Failed from the real scenarios (BEFORE any filter)
+    // Rule: a validated scenario (checked=1) counts as Passed.
+    //       otherwise -> Failed if TearDownFailed>0, Flaky if TearDownWarning>0, Passed otherwise.
     $calcPassed = 0;
     $calcFlaky  = 0;
     $calcFailed = 0;
     foreach ($scenarios as $sc) {
         if (!empty($sc['checked'])) {
-            $calcPassed++;                       // validé => Passed
+            $calcPassed++;                       // validated => Passed
         } elseif (($sc['TearDownFailed'] ?? 0) > 0) {
             $calcFailed++;
         } elseif (($sc['TearDownWarning'] ?? 0) > 0) {
-            $calcFlaky++;                        // Flaky reste Flaky et est compté
+            $calcFlaky++;                        // Flaky stays Flaky and is counted
         } else {
             $calcPassed++;
         }
     }
-    // Injecter dans $testset pour l'affichage de .testset-info
+    // Inject into $testset for the .testset-info display
     $testset['TearDownPassed']  = $calcPassed;
     $testset['TearDownWarning'] = $calcFlaky;
     $testset['TearDownFailed']  = $calcFailed;
 
-    // Apply filter: only failed scenarios (après le calcul des totaux)
+    // Apply filter: only failed scenarios (after computing the totals)
     if ($onlyFailed) {
         $scenarios = array_filter($scenarios, function($scenario) {
             return ($scenario['TearDownFailed'] ?? 0) > 0;
         });
     }
 	
-	// Persister les totaux recalculés dans la ligne Main (TestSet) en base
-    // UNIQUEMENT si tous les scénarios sont présents (pas de filtre Failed Only)
-    if (!$onlyFailed && !empty($scenarios) && !empty($testset['AutoID'])) {
+	// Persist the recalculated totals into the Main (TestSet) row in the database
+    // ONLY when all scenarios are present (no Failed Only filter)
+    if (!empty($allScenarios) && !empty($testset['AutoID'])) {
         try {
             $updTestset = $pdo->prepare("
                 UPDATE `$tableName`
@@ -172,20 +215,20 @@ $productsForVersion = $repo->getProductsForVersion($testType);
     <!-- Theme Initialization Script (must be FIRST - before CSS) -->
     <script>
         (function() {
-            // Déterminer le thème avant que le CSS ne charge
+            // Determine the theme before the CSS loads
             const savedTheme = localStorage.getItem('logg-theme');
-            let appliedTheme = 'light'; // Défaut
+            let appliedTheme = 'light'; // Default
             
             if (savedTheme === 'dark') {
-                // Mode sombre sauvegardé
+                // Dark mode saved
                 appliedTheme = 'dark';
                 document.documentElement.setAttribute('data-theme', 'dark');
             } else if (savedTheme === 'light') {
-                // Mode clair sauvegardé
+                // Light mode saved
                 appliedTheme = 'light';
                 document.documentElement.setAttribute('data-theme', 'light');
             } else {
-                // Pas de préférence sauvegardée, utiliser la préférence système
+                // No saved preference, use the system preference
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     appliedTheme = 'dark';
                     document.documentElement.setAttribute('data-theme', 'dark');
@@ -195,7 +238,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 }
             }
             
-            // Stocker le thème appliqué pour utilisation après le chargement du DOM
+            // Store the applied theme for use after the DOM has loaded
             window.initialTheme = appliedTheme;
         })();
     </script>
@@ -296,10 +339,52 @@ $productsForVersion = $repo->getProductsForVersion($testType);
 					</div>
 				</form>			
         </div>
-        <?php endif; ?>
+        <?php endif; 
+
+		// Build used for the reruns: latest deployed version (fallback on the build of the run)
+		$deployedBuild = getDeployedBuild($testType, $product);
+		$buildForRun = !empty($deployedBuild) ? trim($deployedBuild) : ($testset['Build'] ?? 'Last');
+		// SmartWe: reformat as "we {BRANCH} #{short hash}"
+		if ($isSmartWe && !empty($deployedBuild)) {
+			$weBranch = strtoupper(explode('_', $testType)[0]); // DEV / RC / HF
+			$buildForRun = "we " . $weBranch . " #" . $deployedBuild; // already truncated to 6 chars
+		}
+		?>
 
         <!-- Scenarios Table -->
-        <h4 style="margin-bottom: 20px;">Scenarios (<?php echo count($scenarios); ?>)</h4>
+        <h4 style="margin-bottom: 20px;">
+            Scenarios (<?php echo count($scenarios); ?>)
+            <?php
+            // Count the failed scenarios and prepare their rerun URLs
+            $failedRerunUrls = [];
+            foreach ($scenarios as $sc) {
+                if (($sc['TearDownFailed'] ?? 0) > 0) {
+                    $failedRerunUrls[] = "rerun.php?" .
+                        "JJob="        . urlencode($testset['JJob'] ?? 'CI') .
+                        "&JParam="     . urlencode($testset['JParam'] ?? '') .
+                        "&Testset="    . urlencode($testset['JParam'] ?? '') .
+                        "&AutoID="     . urlencode($sc['AutoID']) .
+                        "&TCProj="     . urlencode($sc['TCProj'] ?? '') .
+                        "&Build="      . urlencode($buildForRun) .
+                        "&Testtype="   . urlencode($testType) .
+                        "&LogVersion=" . urlencode($testType) .
+                        "&Product="    . urlencode($product) .
+                        "&TestBrowser=". urlencode($browser ?? 'chrome') .
+                        "&localrun=localrun" .
+                        "&retry=retry" .
+                        "&Confirm=1";
+                }
+            }
+            if (!empty($failedRerunUrls)):
+            ?>
+            <button type="button" id="runAllFailedBtn"
+                    class="btn btn-sm btn-danger"
+                    style="margin-left: 15px; vertical-align: middle;"
+                    onclick='runAllFailed(<?php echo json_encode($failedRerunUrls); ?>)'>
+                ▶ Run All Failed (<?php echo count($failedRerunUrls); ?>)
+            </button>
+            <?php endif; ?>
+        </h4>
         
         <div class="results-table">
             <div style="overflow-x: auto;">
@@ -310,6 +395,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                             <th style="width: 100px;" class="sortable" data-sort="teamtag">TeamTag <span class="sort-indicator"></span></th>
                             <th style="width: 200px;">Scenario Name</th>
                             <th style="width: 100px;">Tested Build</th>
+							<th style="width: 60px;">DB</th>
                             <th style="width: 80px;" class="sortable" data-sort="result">Result <span class="sort-indicator"></span></th>
                             <th style="width: 70px;">Run</th>
                             <th style="width: 70px;">Log</th>
@@ -320,12 +406,12 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                     <tbody>
                         <?php if (empty($scenarios)): ?>
                         <tr>
-                            <td colspan="12" class="text-center text-muted py-4">
+                            <td colspan="13" class="text-center text-muted py-4">
                                 No scenarios found for this TestSet
                             </td>
                         </tr>
-                        <?php else: ?>
-                            <?php foreach ($scenarios as $scenario): ?>
+                        <?php else:							
+							foreach ($scenarios as $scenario): ?>
                             <tr data-original-result="<?php echo ($scenario['TearDownFailed'] > 0) ? 'Failed' : (($scenario['TearDownWarning'] > 0) ? 'Flaky' : 'Passed');?>" data-autoid="<?php echo $scenario['AutoID']; ?>" data-failed="<?php echo $scenario['TearDownFailed'] ?? 0; ?>" data-warning="<?php echo $scenario['TearDownWarning'] ?? 0; ?>">
                                 <!-- FeatureTag -->
                                 <td data-sort-value="<?php echo htmlspecialchars($scenario['tag'] ?? '-'); ?>">
@@ -349,9 +435,17 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     <small><?php echo htmlspecialchars($scenario['Build'] ?? '-'); ?></small>
                                 </td>
                                 
+								<!-- DB Server -->
+                                <td>
+                                    <small><?php 
+                                        $db = trim($scenario['DBServer'] ?? '');
+                                        echo htmlspecialchars($db !== '' ? $db : 'SQL');
+                                    ?></small>
+                                </td>
+								
                                 <!-- Result -->
                                 <td class="result-cell" data-sort-value="<?php 
-                                    // Valeur pour le tri
+                                    // Value used for sorting
                                     if ($scenario['checked'] ?? 0) {
                                         echo 'passed';
                                     } elseif ($scenario['TearDownFailed'] > 0) {
@@ -361,11 +455,11 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     }
                                 ?>">
                                     <?php 
-                                    // Si Validated est coché (checked = 1), afficher Passed
+                                    // If Validated is checked (checked = 1), display Passed
                                     if ($scenario['checked'] ?? 0) {
                                         echo '<span class="result-badge result-passed">✅ Passed</span>';
                                     } else {
-                                        // Sinon, afficher le résultat réel
+                                        // Otherwise, display the real result
                                         if ($scenario['TearDownFailed'] > 0) {
                                             echo '<span class="result-badge result-failed">❌ Failed</span>';
                                         } elseif ($scenario['TearDownWarning'] > 0) {
@@ -380,14 +474,14 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                 <!-- Trigger -->
                                 <td class="text-center">
                                     <?php 
-                                    // Construire le lien rerun avec tous les paramètres
+									// Build the rerun link with all the parameters
                                     $triggerLink = "rerun.php?" .
                                                    "JJob=" . urlencode($testset['JJob'] ?? 'CI') .
                                                    "&JParam=" . urlencode($testset['JParam'] ?? '') .
                                                    "&Testset=" . urlencode($testset['JParam'] ?? '') .
                                                    "&AutoID=" . urlencode($scenario['AutoID']) .
                                                    "&TCProj=" . urlencode($scenario['TCProj'] ?? '') .
-                                                   "&Build=" . urlencode($testset['Build'] ?? 'Last') .
+                                                   "&Build=" . urlencode($buildForRun) .
                                                    "&Testtype=" . urlencode($testType) .
                                                    "&LogVersion=" . urlencode($testType) .
                                                    "&Product=" . urlencode($product) .
@@ -400,7 +494,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     $runningStatus = $scenario['running'] ?? $scenario['Running'] ?? 0;
                                     ?>
                                     <?php if ($runningStatus == 2): ?>
-                                        <!-- Test en cours - bouton cliquable pour réinitialiser -->
+                                        <!-- Test running - clickable button to reset it -->
                                         <button type="button" 
                                              class="btn btn-sm btn-warning reset-running-scenario-btn"
                                              title="Test is running - Click to reset"
@@ -413,7 +507,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running
                                         </button>
                                     <?php else: ?>
-                                        <!-- Test prêt à relancer -->
+                                        <!-- Test ready to be re-run -->
                                         <a href="<?php echo htmlspecialchars($triggerLink); ?>" 
                                            target="_self" 
                                            title="Run this scenario"
@@ -481,7 +575,34 @@ $productsForVersion = $repo->getProductsForVersion($testType);
 
     <!-- Theme Toggle Script -->
     <script>
-        // Calculer et ajuster les positions sticky
+		// Trigger a run for every failed scenario
+        function runAllFailed(urls) {
+            if (!urls || urls.length === 0) return;
+
+            const btn = document.getElementById('runAllFailedBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Starting...';
+            }
+
+            // Trigger each rerun in the background (fetch, no navigation)
+            let done = 0;
+            const promises = urls.map(url =>
+                fetch(url, { method: 'GET', mode: 'no-cors' })
+                    .then(() => { done++; })
+                    .catch(err => { console.error('Rerun failed:', url, err); })
+            );
+
+            Promise.all(promises).then(() => {
+                if (btn) {
+                    btn.innerHTML = '✅ ' + done + ' triggered';
+                }
+                // Reload the page after a short delay to see the "Running" statuses
+                setTimeout(() => { window.location.reload(); }, 1500);
+            });
+        }
+		
+        // Compute and adjust the sticky positions
         function updateStickyPositions() {
             const header = document.querySelector('.header');
             const filters = document.querySelector('.filters');
@@ -501,7 +622,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 }
                 
                 if (thead) {
-                    // Ne pas ajouter de top au thead pour details.php
+                    // Do not add a top offset to the thead for details.php
                     // const filterHeight = filters ? filters.offsetHeight : 0;
                     // const statsHeight = stats ? stats.offsetHeight : 0;
                     // thead.style.top = (headerHeight + filterHeight + statsHeight) + 'px';
@@ -509,9 +630,9 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             }
         }
         
-        // Exécuter au chargement
+        // Run on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Appliquer les classes de thème basées sur le thème initial déterminé
+            // Apply the theme classes based on the initial theme
             if (window.initialTheme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
@@ -522,6 +643,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             
             updateThemeButton();
 			
+			// Enable transitions AFTER the first paint (avoids the load flash)
 			requestAnimationFrame(function() {
                 requestAnimationFrame(function() {
                     document.body.classList.add('theme-ready');
@@ -530,7 +652,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
 
             setTimeout(updateStickyPositions, 100);
             
-            // Restaurer la préférence "All Scenarios / Failed Only" depuis localStorage
+            // Restore the "All Scenarios / Failed Only" preference from localStorage
             const savedErrorOnly = localStorage.getItem('logg-error-only');
             if (savedErrorOnly !== null) {
                 const btnId = savedErrorOnly === '1' ? 'onlyFailedBtn' : 'allResultsBtn';
@@ -540,14 +662,14 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                     const isCurrentlyChecked = targetBtn.checked;
                     targetBtn.checked = true;
                     
-                    // Si la valeur sauvegardée est différente de celle actuellement cochée, soumettre le formulaire
+                    // If the saved value differs from the currently checked one, submit the form
                     if (!isCurrentlyChecked) {
                         targetBtn.form.submit();
                     }
                 }
             }
             
-            // Sauvegarder le choix dans localStorage quand on change
+            // Save the choice in localStorage when it changes
             const allResultsBtn = document.getElementById('allResultsBtn');
             const onlyFailedBtn = document.getElementById('onlyFailedBtn');
             
@@ -567,10 +689,10 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 });
             }
             
-            // Gérer le clic sur les boutons Run pour les transformer en "Running"
+            // Handle the click on the Run buttons to turn them into "Running"
             document.querySelectorAll('.trigger-link').forEach(link => {
                 link.addEventListener('click', function(e) {
-                    // Ne pas empêcher la navigation, juste transformer le bouton
+                    // Do not prevent navigation, just transform the button
                     this.classList.remove('btn-success');
                     this.classList.add('btn-warning');
                     this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running';
@@ -580,15 +702,15 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             });
         });
         
-        // Gérer le clic sur le bouton "Running" - fonction globale appelée par onclick inline
+        // Handle the click on the "Running" button - global function called by the inline onclick
         function resetScenarioRunning(autoID, testType, product, btnElement) {
             console.log('resetScenarioRunning called - AutoID:', autoID, 'TestType:', testType, 'Product:', product);
             
-            // Feedback visuel
+            // Visual feedback
             btnElement.style.opacity = '0.5';
             btnElement.style.pointerEvents = 'none';
             
-            // Appeler check.php pour remettre running=0
+            // Call check.php to set running back to 0
             const url = 'check.php?value=0&field=running' + 
                   '&autoid=' + encodeURIComponent(autoID) + 
                   '&LogVersion=' + encodeURIComponent(testType) +
@@ -623,7 +745,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 });
         }
         
-        // Recalculer au redimensionnement
+        // Recompute on resize
         window.addEventListener('resize', updateStickyPositions);
 
         function updateThemeButton() {
@@ -645,13 +767,13 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             const isDarkMode = document.body.classList.contains('dark-mode');
             
             if (isDarkMode) {
-                // Passer en mode clair
+                // Switch to light mode
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
                 document.documentElement.setAttribute('data-theme', 'light');
                 localStorage.setItem('logg-theme', 'light');
             } else {
-                // Passer en mode sombre
+                // Switch to dark mode
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
                 document.documentElement.setAttribute('data-theme', 'dark');
@@ -695,7 +817,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             `;
         }
         
-        // Text size slider - Déclarer avant loadUserPreferences
+        // Text size slider - declare it before loadUserPreferences
         const textSizeSlider = document.getElementById('textSizeSlider');
         
         // Load user preferences from local cache on page load
@@ -703,7 +825,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             const cached = localStorage.getItem('logg-prefs');
             const prefs = cached ? JSON.parse(cached) : {};
             
-            // Apply theme - lire logg-theme (clé partagée entre toutes les pages)
+            // Apply theme - read logg-theme (key shared across all pages)
             const theme = localStorage.getItem('logg-theme') || prefs.theme || 'light';
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
@@ -727,138 +849,111 @@ $productsForVersion = $repo->getProductsForVersion($testType);
         // Save preferences to local cache
         function savePreferences() {
             const textSizeSlider = document.getElementById('textSizeSlider');
-            const prefs = {
-                theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
-                text_size: textSizeSlider ? parseInt(textSizeSlider.value) : 100,
-                error_only: 0,
-                product: '',
-                testtype: '',
-                test_browser: '',
-                team_tag: ''
-            };
-            
+            // Preserve the existing preferences (product/testtype/team_tag are managed by index.php)
+            let prefs = {};
+            try {
+                const cached = localStorage.getItem('logg-prefs');
+                if (cached) prefs = JSON.parse(cached);
+            } catch (e) {}
+            // Only update what details.php controls
+            prefs.theme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+            prefs.text_size = textSizeSlider ? parseInt(textSizeSlider.value) : 100;
             localStorage.setItem('logg-prefs', JSON.stringify(prefs));
         }
         
         // Load preferences on page load
         loadUserPreferences();
         
-        // Text size slider (textSizeSlider déjà déclaré plus haut)
+        // Text size slider (textSizeSlider already declared above)
         if (textSizeSlider) {
             // Handle slider input
             textSizeSlider.addEventListener('input', function() {
                 const size = this.value;
                 applyTextSize(parseInt(size));
-                savePreferences(document.body.classList.contains('dark-mode') ? 'dark' : 'light', size);
+                savePreferences();
             });
         }
         
-        // Mettre à jour la validation d'un scénario et rafraîchir les totaux
+        // Update the validation of a scenario and refresh the totals
         function updateScenarioValidation(autoID, isChecked, testType, product) {
-            console.log('updateScenarioValidation called:', {autoID, isChecked, testType, product});
-            
-            // Trouver la ligne du scénario par data-autoid
-            const scenarioRow = document.querySelector(`tr[data-autoid="${autoID}"]`);
-            
-            if (!scenarioRow) {
-                console.error('Ligne du scénario non trouvée pour AutoID:', autoID);
-                return;
-            }
-            
-            // Trouver la colonne Result (5ème colonne, index 4)
-            const resultCell = scenarioRow.querySelector('td:nth-child(5)');
-            
-            // Mettre à jour le Result visuellement
+            const row = document.querySelector('tr[data-autoid="' + autoID + '"]');
+            if (!row) { console.error('Row not found:', autoID); return; }
+
+            const resultCell = row.querySelector('.result-cell');
+            const origin = row.getAttribute('data-original-result') || 'Passed';
+
+            // Deltas: validated => Passed
+            let dPassed = 0, dFlaky = 0, dFailed = 0;
+            if (origin === 'Failed') { dPassed = 1; dFailed = -1; }
+            else if (origin === 'Flaky') { dPassed = 1; dFlaky = -1; }
+
             if (resultCell) {
                 if (isChecked) {
-                    // Coché = Flaky
-                    resultCell.innerHTML = '<span class="result-badge result-flaky">⚠️ Flaky</span>';
-                    console.log('Result changé en Flaky');
+                    resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
+                    updateCounters(dPassed, dFlaky, dFailed);
                 } else {
-                    // Décoché = Failed (par défaut)
-                    resultCell.innerHTML = '<span class="result-badge result-failed">❌ Failed</span>';
-                    console.log('Result changé en Failed');
+                    if (origin === 'Failed')      resultCell.innerHTML = '<span class="result-badge result-failed">❌ Failed</span>';
+                    else if (origin === 'Flaky')  resultCell.innerHTML = '<span class="result-badge result-flaky">⚠️ Flaky</span>';
+                    else                          resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
+                    updateCounters(-dPassed, -dFlaky, -dFailed);
                 }
-            } else {
-                console.error('Colonne Result non trouvée');
             }
-            
-            // Envoyer la mise à jour au serveur
+
             fetch('update_validation.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'AutoID=' + encodeURIComponent(autoID) + 
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'AutoID=' + encodeURIComponent(autoID) +
                       '&Checked=' + (isChecked ? 1 : 0) +
                       '&TestType=' + encodeURIComponent(testType) +
                       '&Product=' + encodeURIComponent(product)
             })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.text();
-            })
+            .then(r => r.text())
             .then(text => {
-                console.log('Response text:', text);
                 try {
                     const data = JSON.parse(text);
-                    if (data.success) {
-                        updateTestSetStats();
-                        console.log('Validation mise à jour avec succès');
-                    } else {
-                        console.error('Erreur serveur:', data.error);
-                        alert('Erreur: ' + (data.error || 'Impossible de mettre à jour'));
-                    }
-                } catch (e) {
-                    console.error('Erreur JSON parse:', e);
-                    console.error('Contenu reçu:', text);
-                    alert('Erreur de format serveur');
-                }
+                    if (data.success) { updateTestSetStats(testType, product); }
+                    else { console.error('Server error:', data.error); alert('Error: ' + (data.error || '')); }
+                } catch (e) { console.error('JSON parse:', e, text); alert('Server format error'); }
             })
-            .catch(error => {
-                console.error('Erreur fetch:', error);
-                alert('Erreur réseau: ' + error.message);
-            });
+            .catch(err => { console.error('fetch:', err); alert('Network error: ' + err.message); });
         }
-        
-        // Rafraîchir les totaux des statistiques du TestSet
-        function updateTestSetStats() {
-            // Récalculer les totaux en fonction des résultats visibles
-            let passed = 0;
-            let flaky = 0;
-            let failed = 0;
-            
-            const resultBadges = document.querySelectorAll('.result-badge');
-            for (let badge of resultBadges) {
-                if (badge.classList.contains('result-passed')) {
-                    passed++;
-                } else if (badge.classList.contains('result-flaky')) {
-                    flaky++;
-                } else if (badge.classList.contains('result-failed')) {
-                    failed++;
-                }
-            }
-            
-            // Mettre à jour l'affichage des totaux
-            const statsCards = document.querySelectorAll('.stat-card');
-            for (let card of statsCards) {
-                if (card.classList.contains('stat-passed')) {
-                    const countElement = card.querySelector('.stat-count');
-                    if (countElement) {
-                        countElement.textContent = passed;
-                    }
-                } else if (card.classList.contains('stat-flaky')) {
-                    const countElement = card.querySelector('.stat-count');
-                    if (countElement) {
-                        countElement.textContent = flaky;
-                    }
-                } else if (card.classList.contains('stat-failed')) {
-                    const countElement = card.querySelector('.stat-count');
-                    if (countElement) {
-                        countElement.textContent = failed;
-                    }
-                }
-            }
+		
+		// Update the Passed/Flaky/Failed counters displayed in .testset-info
+		function updateCounters(passedDelta, flakyDelta, failedDelta) {
+            const info = document.querySelector('.testset-info');
+            if (!info) return;
+            const p = info.querySelector('span.status-passed');
+            const f = info.querySelector('span.status-flaky');
+            const x = info.querySelector('span.status-failed');
+            if (p) p.textContent = (parseInt(p.textContent.replace(/\D/g,'')) || 0) + passedDelta;
+            if (f) f.textContent = (parseInt(f.textContent.replace(/\D/g,'')) || 0) + flakyDelta;
+            if (x) x.textContent = (parseInt(x.textContent.replace(/\D/g,'')) || 0) + failedDelta;
+        }
+		
+        // Persist the TestSet totals in the database
+        function updateTestSetStats(testType, product) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoID = urlParams.get('AutoID');
+            if (!autoID) return;
+            if (!testType) testType = urlParams.get('Testtype') || '';
+            if (!product)  product  = urlParams.get('Product')  || '';
+
+            const info = document.querySelector('.testset-info');
+            if (!info) return;
+            const passed = parseInt((info.querySelector('span.status-passed')?.textContent || '0').replace(/\D/g,'')) || 0;
+            const flaky  = parseInt((info.querySelector('span.status-flaky')?.textContent  || '0').replace(/\D/g,'')) || 0;
+            const failed = parseInt((info.querySelector('span.status-failed')?.textContent || '0').replace(/\D/g,'')) || 0;
+
+            fetch('update_testset_stats.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'AutoID=' + encodeURIComponent(autoID) +
+                      '&Passed=' + encodeURIComponent(passed) +
+                      '&Flaky=' + encodeURIComponent(flaky) +
+                      '&Failed=' + encodeURIComponent(failed) +
+                      '&TestType=' + encodeURIComponent(testType) +
+                      '&Product=' + encodeURIComponent(product)
+            }).then(r => r.text()).then(t => console.log('stats:', t)).catch(e => console.error(e));
         }
         
     </script>

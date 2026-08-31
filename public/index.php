@@ -48,7 +48,7 @@ function getDeployedBuild($testType, $product) {
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     
     if ($isSmartWe) {
-        // SmartWe: testtype format is "dev_x17", "rc_x17", "hf_x17"
+        // SmartWe: testtype format is "dev_x18", "rc_x18", "hf_x18"
         // Deploy file format: lastWewercDeploy.txt (lastWe + we + rc)
         $parts = explode("_", $testType);
         if (count($parts) == 2) {
@@ -71,7 +71,7 @@ function getDeployedBuild($testType, $product) {
     // Read the deployed build file
 	if ($deployFile && file_exists($deployFile)) {
 		$content = trim(file_get_contents($deployFile));
-		// SmartWe : ne garder que le hash court (6 premiers caractères)
+		// SmartWe: keep only the short hash (first 6 characters)
 		if ($isSmartWe) {
 			$content = substr($content, 0, 6);
 		}
@@ -88,8 +88,8 @@ $testsetFilter = $_GET['TestsetFilter'] ?? '';  // Filter by TestSet name
 $teamTag = $_GET['TeamTag'] ?? '';  // Filter by Team tag
 $errorOnly = isset($_GET['ErrorOnly']) && $_GET['ErrorOnly'] === '1';  // Show only errors
 
-// Normaliser le testType pour SmartWe AVANT toute requête BD
-// SmartWe : rc → rc_x17, hf → hf_x17 (forcés), dev → garde sa version
+// Normalize the testType for SmartWe BEFORE any DB query
+// SmartWe: rc -> rc_x18, hf -> hf_x18 ,dev -> dev_x18
 $isSmartWe = (strpos($product, 'weWebSel') !== false || 
               strpos($product, 'weClient') !== false || 
               strpos($product, 'smartWe') !== false || 
@@ -97,11 +97,10 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = 'hf_x17';  // Forcer hf_x17
+        $testType = $LOGG_SMARTWE_HF;  // ex: hf_x18 (voir config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = 'rc_x17';  // Forcer rc_x17
+        $testType = $LOGG_SMARTWE_RC;  // ex: rc_x18 (voir config/versions_config.php)
     }
-    // dev garde sa version (dev_x18, etc.)
 }
 
 // Pagination parameters
@@ -119,7 +118,7 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute();
     $result = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    // Ajouter @team_sqs au début s'il n'existe pas
+    // Add @team_sqs at the beginning if it does not exist
     $uniqueTeamTags = array_filter($result);
     if (!in_array('@team_sqs', $uniqueTeamTags)) {
         array_unshift($uniqueTeamTags, '@team_sqs');
@@ -182,12 +181,12 @@ try {
             // Filter by Team tag
             if (!empty($teamTag)) {
                 $jparam = $testset['JParam'] ?? '';
-                // @nightly et @smokeTest : teamtag toujours @team_sqs (ignorer les teamtags des scénarios)
+                // @nightly and @smokeTest: teamtag is always @team_sqs (ignore the scenario teamtags)
                 if (stripos($jparam, '@nightly') !== false || stripos($jparam, '@smokeTest') !== false) {
                     $currentTeamTag = '@team_sqs';
                 } else {
                     $currentTeamTag = $testset['teamtag'] ?? '';
-                    // Normaliser les valeurs vides/0/1 à @team_sqs
+                    // Normalize empty/0/1 values to an empty tag
                     if (empty($currentTeamTag) || $currentTeamTag === '0' || $currentTeamTag === '1') {
                         $currentTeamTag = '';
                     }
@@ -197,11 +196,11 @@ try {
                 }
             }
             
-            // Filter by errors only (garde aussi les tests en cours "running")
+            // Filter by errors only (also keeps the tests currently "running")
             if ($errorOnly) {
                 $failed = $testset['TearDownFailed'] ?? 0;
                 $running = $testset['running'] ?? $testset['Running'] ?? 0;
-                // Garder si : a des échecs OU est en cours d'exécution
+                // Keep if: has failures OR is currently running
                 if ($failed == 0 && $running != 2) {
                     return false;
                 }
@@ -210,10 +209,22 @@ try {
             return true;
         });
         
-        // Sort by date descending
-        usort($testsets, function($a, $b) {
-            return strtotime($b['RunDate'] ?? 0) - strtotime($a['RunDate'] ?? 0);
-        });
+        // Feature mode: group the TestSets by JJob (like stats.php)
+        $isFeature = ($testType === 'we_feat' || $testType === 'web_feat');
+
+        if ($isFeature) {
+            // Sort by JJob first, then by date descending inside each job
+            usort($testsets, function($a, $b) {
+                $cmp = strcmp($a['JJob'] ?? '', $b['JJob'] ?? '');
+                if ($cmp !== 0) return $cmp;
+                return strtotime($b['RunDate'] ?? 0) - strtotime($a['RunDate'] ?? 0);
+            });
+        } else {
+            // Sort by date descending
+            usort($testsets, function($a, $b) {
+                return strtotime($b['RunDate'] ?? 0) - strtotime($a['RunDate'] ?? 0);
+            });
+        }
         
         // Apply pagination
         $totalTestsets = count($testsets);
@@ -262,50 +273,40 @@ foreach ($versions as $v) {
 // Get test types for current product (based on actual data)
 $testTypesForProduct = $repo->getAvailableTestTypesForProduct($product);
 
-// Détecter gW Desktop (gWClient)
+// Detect gW Desktop (gWClient)
 $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
-// Pour gW Desktop, forcer la liste de branches spécifique
+// For gW Desktop, force the specific branch list
+// (liste centralisée dans config/versions_config.php : $LOGG_GW_DESKTOP_LIST)
 if ($isGwDesktop) {
-    // Afficher toutes ces branches, qu'elles aient des données ou non
-    $testTypesForProduct = ['rc_x16', 'hf_x16', 'rc_x17', 'hf_x17', 'rc_x18', 'hf_x18'];
+    // Display all these branches, whether they have data or not
+    $testTypesForProduct = $LOGG_GW_DESKTOP_LIST;
 } else {
-    // Pour les autres produits (gW Web, etc.), exclure les branches obsolètes
-    $excludedBranches = ['dev_x15'];  // Versions plus disponibles
-    $testTypesForProduct = array_values(array_filter($testTypesForProduct, function($tt) use ($excludedBranches) {
-        return !in_array($tt, $excludedBranches);
-    }));
-    
-    // Ajouter les branches futures (pas encore disponibles) si absentes
-    // Elles seront affichées entre parenthèses dans le select
-    $futureBranches = ['rc_x18', 'hf_x18'];
-    foreach ($futureBranches as $fb) {
-        if (!in_array($fb, $testTypesForProduct)) {
-            $testTypesForProduct[] = $fb;
-        }
-    }
-	
-	// Ajouter la branche feature (gW Web) si absente
+    // For the other products (gW Web, etc.), obsolete branches are already
+    // excluded upstream: TestLogRepository ne renvoie que les branches dont
+    // le statut n'est pas 'retired' dans config/versions_config.php.
+
+    // Add the feature branch (gW Web) if missing
     if (!$isSmartWe && !in_array('web_feat', $testTypesForProduct)) {
         $testTypesForProduct[] = 'web_feat';
     }
 }
 
-// Pour SmartWe, créer un mapping label simplifié → testType réel
-// ($isSmartWe et la normalisation de $testType sont déjà faits plus haut)
+// For SmartWe, build a simplified label -> real testType mapping
+// ($isSmartWe and the $testType normalization are already done above)
 if ($isSmartWe) {
-    $smartWeMapping = []; // ['dev' => 'dev_x18', 'rc' => 'rc_x17', 'hf' => 'hf_x17']
+    $smartWeMapping = []; // ['dev' => 'dev_x18', 'rc' => 'rc_x18', 'hf' => 'hf_x17']
     foreach ($testTypesForProduct as $tt) {
         if (stripos($tt, 'dev') !== false && !isset($smartWeMapping['dev'])) {
             $smartWeMapping['dev'] = $tt;
         }
     }
-    // Forcer rc_x17 et hf_x17
-    $smartWeMapping['rc'] = 'rc_x17';
-    $smartWeMapping['hf'] = 'hf_x17';
+    
+    $smartWeMapping['hf'] = 'hf_x18';
+	$smartWeMapping['rc'] = 'rc_x18';
 	$smartWeMapping['feature'] = 'we_feat';
     
-    // Réordonner: dev, rc, hf
+    // Reorder: dev, rc, hf, feature
     $ordered = [];
     foreach (['dev', 'rc', 'hf', 'feature'] as $branch) {
         if (isset($smartWeMapping[$branch])) {
@@ -315,7 +316,7 @@ if ($isSmartWe) {
     $smartWeMapping = $ordered;
 }
 
-// Si aucun TestType n'a de données, afficher un message
+// If no TestType has data, display a message
 if (empty($testTypesForProduct)) {
     $error = "No data available for product: " . htmlspecialchars($product);
 }
@@ -331,9 +332,9 @@ if (empty($testTypesForProduct)) {
     <!-- Theme Initialization Script (must be FIRST - before CSS) -->
     <script>
         (function() {
-            // Déterminer le thème avant que le CSS ne charge
+            // Determine the theme before the CSS loads
             const savedTheme = localStorage.getItem('logg-theme');
-            let appliedTheme = 'light'; // Défaut
+            let appliedTheme = 'light'; // Default
             
             if (savedTheme === 'dark') {
                 appliedTheme = 'dark';
@@ -355,7 +356,7 @@ if (empty($testTypesForProduct)) {
         })();
     </script>
     
-    <!-- Early Filters Redirect: applique TOUS les filtres du cache AVANT le rendu -->
+    <!-- Early Filters Redirect: applies ALL cached filters BEFORE rendering -->
     <script>
         (function() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -494,9 +495,11 @@ if (empty($testTypesForProduct)) {
                                     </option>
                                 <?php endforeach; ?>
                             <?php else: ?>
-                                <?php 
-                                $notYetAvailable = ['rc_x18', 'hf_x18'];
-                                foreach ($testTypesForProduct as $v): 
+                                <?php
+                                // Branches marquées 'future' dans config/versions_config.php
+                                // -> affichées entre parenthèses (pas encore disponibles)
+                                $notYetAvailable = $LOGG_FUTURE_TESTTYPES;
+                                foreach ($testTypesForProduct as $v):
                                     $displayLabel = in_array($v, $notYetAvailable) ? "($v)" : $v;
                                 ?>
                                     <option value="<?php echo htmlspecialchars($v); ?>" 
@@ -508,7 +511,7 @@ if (empty($testTypesForProduct)) {
                         </select>
                     </div>
 
-                    <!-- Browser (caché - toujours chrome par défaut) -->
+                    <!-- Browser (hidden - always chrome by default) -->
                     <input type="hidden" name="TestBrowser" value="chrome">
 
                     <!-- Team Filter -->
@@ -594,6 +597,7 @@ if (empty($testTypesForProduct)) {
                         <tr>
                             <th style="width: 200px; text-align: center;" class="sortable" data-sort="testset">TestSet <span class="sort-indicator"></span></th>
                             <th style="width: 80px; text-align: center;" class="sortable" data-sort="version">Tested version <span class="sort-indicator"></span></th>
+							<th style="width: 55px; text-align: center;">DB</th>
                             <th style="width: 45px; text-align: center;" class="sortable" data-sort="passed">Passed <span class="sort-indicator"></span></th>
                             <th style="width: 45px; text-align: center;" class="sortable" data-sort="failed">Failed <span class="sort-indicator"></span></th>
                             <th style="width: 55px; text-align: center;">Testcases</th>
@@ -608,17 +612,29 @@ if (empty($testTypesForProduct)) {
                     <tbody>
                         <?php if (empty($testsets)): ?>
                         <tr>
-                            <td colspan="13" class="text-center text-muted py-4">
+                            <td colspan="12" class="text-center text-muted py-4">
                                 No TestSets found for this selection
                             </td>
                         </tr>
                         <?php else: ?>
-                            <?php foreach ($testsets as $testset): ?>
+                            <?php 
+                            $currentJJob = null;
+                            foreach ($testsets as $testset): 
+                                // Feature mode: insert a header row on each JJob change
+                                if ($isFeature && ($testset['JJob'] ?? '') !== $currentJJob):
+                                    $currentJJob = $testset['JJob'] ?? '';
+                            ?>
+                            <tr class="job-group-header">
+                                <td colspan="12">
+                                    <strong>📁 <?php echo htmlspecialchars($currentJJob); ?></strong>
+                                </td>
+                            </tr>
+                            <?php endif; ?>
                             <tr>
                                 <!-- TestSet -->
                                 <?php
-									// Construire le lien vers stats.php
-                                    // LogVersion = nom de table (ex: dev_x17 + gWWebSel → x17_dev)
+									// Build the link to stats.php
+                                    // LogVersion = table name (e.g. dev_x17 + gWWebSel -> x17_dev)
                                     $statsLogVersion = $repo->getTableForTestType($testType, $product);
                                     $statsLink = "stats.php?LogVersion=" . urlencode($statsLogVersion) .
                                                  "&JJob=" . urlencode($testset['JJob']) .
@@ -669,8 +685,14 @@ if (empty($testTypesForProduct)) {
                                 <td data-sort-value="<?php echo htmlspecialchars($testedBuild); ?>">
                                     <small><b><span style='color: <?php echo $formatTestedVersion; ?>;'><?php echo !empty($testedBuild) ? htmlspecialchars($testedBuild) : '-'; ?></span></b></small>
                                 </td>
-                                
-                                <!-- Passed (incluant Flaky) -->
+                                <!-- DB Server -->
+                                <td style="text-align: center;">
+                                    <small><?php 
+                                        $db = trim($testset['DBServer'] ?? '');
+                                        echo htmlspecialchars($db !== '' ? $db : 'SQL');
+                                    ?></small>
+                                </td>
+                                <!-- Passed (including Flaky) -->
                                 <td class="table-number status-passed" data-sort-value="<?php echo ($testset['TearDownPassed'] + $testset['TearDownWarning']) ?? 0; ?>">
                                     <?php echo ($testset['TearDownPassed'] + $testset['TearDownWarning']) ?? 0; ?>
                                 </td>
@@ -714,18 +736,16 @@ if (empty($testTypesForProduct)) {
                                                  "&TestBrowser=" . urlencode($browser ?? 'chrome') .
                                                  "&ErrorOnly=" . ($errorOnly ? '1' : '0');
                                     
-                                    // Utiliser la dernière version déployée comme Build pour le rerun
-                                    // (au lieu de la version du dernier run). Fallback sur 'Last' si non trouvée.
-                                    // Utiliser la dernière version déployée comme Build pour le rerun
-                                    // (au lieu de la version du dernier run). Fallback sur 'Last' si non trouvée.
+                                    // Use the latest deployed version as the Build for the rerun
+                                    // (instead of the build of the last run). Fallback to 'Last' if not found.
                                     $deployedBuildForRun = getDeployedBuild($testType, $product);
                                     $buildForRun = !empty($deployedBuildForRun) ? trim($deployedBuildForRun) : ($testset['Build'] ?? 'Last');
 									
-									// SmartWe : reconstruire le Build au format "we {BRANCH} #{hash court}"
-                                    // ex: deployed = ecd727eb6105... + branche dev  ->  "we DEV #ecd727"
+									// SmartWe: rebuild the Build as "we {BRANCH} #{short hash}"
+                                    // e.g. deployed = ecd727eb6105... + branch dev  ->  "we DEV #ecd727"
                                     if ($isSmartWe && !empty($deployedBuildForRun)) {
                                         $shortHash = substr(trim($deployedBuildForRun), 0, 6);
-                                        // Extraire la branche depuis le testType (dev_x18 -> dev)
+                                        // Extract the branch from the testType (dev_x18 -> dev)
                                         $weBranch = strtoupper(explode('_', $testType)[0]); // DEV / RC / HF
                                         $buildForRun = "we " . $weBranch . " #" . $shortHash;
                                     }
@@ -822,11 +842,11 @@ if (empty($testTypesForProduct)) {
                                     <small><?php 
                                         $teamtag = $testset['teamtag'] ?? '';
                                         $jparam = $testset['JParam'] ?? '';
-                                        // Pour @nightly et @smokeTest : toujours @team_sqs
+                                        // For @nightly and @smokeTest: always @team_sqs
                                         if (stripos($jparam, '@nightly') !== false || stripos($jparam, '@smokeTest') !== false) {
                                             echo '@team_sqs';
                                         } elseif (empty($teamtag) || $teamtag === '0' || $teamtag === '1') {
-                                            // Vide/0/1 : laisser vide
+                                            // Empty/0/1: leave blank
                                             echo '';
                                         } else {
                                             echo htmlspecialchars($teamtag);
@@ -919,13 +939,14 @@ if (empty($testTypesForProduct)) {
             
             updateThemeButton();
             
+			// Enable transitions AFTER the first paint (avoids the load flash)
 			requestAnimationFrame(function() {
                 requestAnimationFrame(function() {
                     document.body.classList.add('theme-ready');
                 });
             });
 
-            // GESTION CENTRALISÉE DES FILTRES
+            // CENTRALIZED FILTER HANDLING
             ['product', 'testtype', 'teamtag'].forEach(function(id) {
                 const el = document.getElementById(id);
                 if (el) {
@@ -978,7 +999,23 @@ if (empty($testTypesForProduct)) {
             }
         });
 
-        function updateThemeButton() {
+        // Save preferences to local cache
+        function savePreferences() {
+			const browserEl = document.getElementById('browser');
+			const prefs = {
+				theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
+				text_size: parseInt(textSizeSlider.value),
+				error_only: document.getElementById('errorsOnBtn').checked ? 1 : 0,
+				product: document.getElementById('product').value,
+				testtype: document.getElementById('testtype').value,
+				test_browser: browserEl ? browserEl.value : 'chrome',
+				team_tag: document.getElementById('teamtag').value
+			};
+			
+			localStorage.setItem('logg-prefs', JSON.stringify(prefs));
+		}
+
+		function updateThemeButton() {
             const themeToggle = document.getElementById('themeToggle');
             if (!themeToggle) return;
 
@@ -997,11 +1034,13 @@ if (empty($testTypesForProduct)) {
             const isDarkMode = document.body.classList.contains('dark-mode');
             
             if (isDarkMode) {
+                // Switch to light mode
                 document.body.classList.remove('dark-mode');
                 document.body.classList.add('light-mode');
                 document.documentElement.setAttribute('data-theme', 'light');
                 localStorage.setItem('logg-theme', 'light');
             } else {
+                // Switch to dark mode
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
                 document.documentElement.setAttribute('data-theme', 'dark');
@@ -1011,6 +1050,7 @@ if (empty($testTypesForProduct)) {
             savePreferences();
         }
         
+        // Apply text size changes
         function applyTextSize(percentage) {
             const baseFontSize = 14;
             const newFontSize = (baseFontSize * percentage) / 100;
@@ -1043,13 +1083,14 @@ if (empty($testTypesForProduct)) {
         
         const textSizeSlider = document.getElementById('textSizeSlider');
         
+        // Load user preferences from local cache on page load
         function loadUserPreferences() {
             const cached = localStorage.getItem('logg-prefs');
             const prefs = cached ? JSON.parse(cached) : {};
-            
             const urlParams = new URLSearchParams(window.location.search);
-            
-            const theme = prefs.theme || 'light';
+            // Apply theme - read logg-theme (key shared across all pages)
+            const theme = localStorage.getItem('logg-theme') || prefs.theme || 'light';
+			
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
@@ -1092,21 +1133,6 @@ if (empty($testTypesForProduct)) {
                     errorsOffBtn.checked = true;
                 }
             }
-        }
-        
-        function savePreferences() {
-            const browserEl = document.getElementById('browser');
-            const prefs = {
-                theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
-                text_size: parseInt(textSizeSlider.value),
-                error_only: document.getElementById('errorsOnBtn').checked ? 1 : 0,
-                product: document.getElementById('product').value,
-                testtype: document.getElementById('testtype').value,
-                test_browser: browserEl ? browserEl.value : 'chrome',
-                team_tag: document.getElementById('teamtag').value
-            };
-            
-            localStorage.setItem('logg-prefs', JSON.stringify(prefs));
         }
         
         loadUserPreferences();

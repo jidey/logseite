@@ -4,6 +4,13 @@
  * Configuration PDO pour MySQL
  */
 
+// Fichier central de configuration des versions/branches (gW Web, gW Desktop, smartWe)
+// -> voir config/versions_config.php pour ajouter/retirer une version
+require_once __DIR__ . '/versions_config.php';
+
+// Rendre le mapping table disponible pour TestLogRepository.php
+$GLOBALS['product_table_map'] = $product_table_map;
+
 // Database credentials
 $db_host = 'localhost';
 $db_name = 'testcomplete';

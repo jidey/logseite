@@ -1,94 +1,31 @@
 <?php
     //echo $LogVersion."<br>";
-	
+
     if (substr($LogVersion, 0, 2) == "we") {
         $versionNumber = "we";
     } else {
-        // Extraire x15, x16, x17, x18, etc.
+        // Extraire x15, x16, x17, x18, x19, etc.
         // Format: "x17_rc" -> extraire "x17"
         preg_match('/x\d+/', $LogVersion, $matches);
         $versionNumber = $matches[0] ?? 'x17';
     }
 
-    if ($versionNumber == "we")
-    {
-    ?>
-        <div class="form-group">
-        <select name="Test_Node" size="1">
-            <option>Grid</option>
-            <option>JDF</option>
-            <option>SV</option>
-            <option>OG</option>
-            <option>AS</option>
-            <option>x16dev</option>
-            <option>x16rc</option>
-            <option>x16hf</option>			
-        </select>	
-        </div>
-    <?php	
-    }
-    if ($versionNumber == "x18")
-    {
-    ?>
-        <select name="Test_x18" size="1">
-            <option>Grid</option>
-            <option>JDF</option>
-            <option>SV</option>
-            <option>OG</option>
-            <option>AS</option>
-            <option>x18dev</option>
-            <option>x18rc</option>
-            <option>x18hf</option>
-        </select>	    
-    <?php	
-    }
-    if ($versionNumber == "x17")
-    {        
-    ?>
-       <select name="Test_x17" size="1">
-            <option>Grid</option>
-            <option>JDF</option>
-            <option>SV</option>
-            <option>OG</option>
-            <option>AS</option>
-            <option>x17dev</option>
-            <option>x17rc</option>
-            <option>x17hf</option>
-        </select>		
-    <?php	
-    }
-    if ($versionNumber == "x16")
-    {
-    ?>
-        <div class="form-group">
-        <select name="Test_x16" size="1">
-            <option>Grid</option>
-            <option>JDF</option>
-            <option>SV</option>
-            <option>OG</option>
-            <option>AS</option>
-            <option>x16dev</option>
-            <option>x16rc</option>
-            <option>x16hf</option>
-        </select>	
-        </div>
-    <?php	
-    }
-    if ($versionNumber == "x15")
-    {
-    ?>
-        <div class="form-group">
-        <select name="Test_x15" size="1">
-            <option>Grid</option>	
-            <option>JDF</option>
-            <option>SV</option>
-            <option>OG</option>
-            <option>AS</option>
-            <option>x15dev</option>
-            <option>x15rc</option>
-            <option>x15hf</option>			
-        </select>	
-        </div>
-    <?php	
+    // Génère dynamiquement le champ "Jenkins Node" pour n'importe quelle
+    // version (plus besoin d'ajouter un bloc ici quand une nouvelle version
+    // gW Web/Desktop est créée dans config/versions_config.php).
+    if ($versionNumber === "we") {
+        $selectName = "Test_Node";
+        // smartWe : sous-menu historique (comportement inchangé)
+        $options = ['Grid', 'JDF', 'SV', 'OG', 'AS', 'x16dev', 'x16rc', 'x16hf'];
+    } else {
+        $selectName = "Test_" . $versionNumber;
+        $options = ['Grid', 'JDF', 'SV', 'OG', 'AS', $versionNumber . 'dev', $versionNumber . 'rc', $versionNumber . 'hf'];
     }
     ?>
+    <div class="form-group">
+    <select name="<?php echo htmlspecialchars($selectName); ?>" size="1">
+        <?php foreach ($options as $opt): ?>
+        <option><?php echo htmlspecialchars($opt); ?></option>
+        <?php endforeach; ?>
+    </select>
+    </div>

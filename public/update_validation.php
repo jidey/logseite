@@ -1,7 +1,7 @@
 <?php
 /**
  * UPDATE_VALIDATION.PHP
- * Met à jour la validation (checked) d'un scénario et retourne le résultat
+ * Updates the validation (checked) of a scenario and returns the result
  */
 header('Content-Type: application/json; charset=utf-8');
 try {
@@ -19,40 +19,38 @@ try {
         throw new Exception('Connexion PDO non disponible');
     }
 
-    // Construire le nom de la table à partir de testType + product
+    // Build the table name from testType + product
     $tableName = null;
     $isSmartWe = (strpos($product, 'weWebSel') !== false || strpos($product, 'weClient') !== false ||
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
+    // Mapping centralisé dans config/versions_config.php (chargé via config.php)
     if ($isSmartWe) {
-        // SmartWe : table we_* selon la branche, indépendamment de la version x
+        // SmartWe: we_* table depending on the branch, regardless of the x version
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';
         elseif (stripos($testType, 'rc') !== false)  $tableName = 'we_rc';
         elseif (stripos($testType, 'dev') !== false) $tableName = 'we_dev';
     } elseif ($isGwDesktop) {
-        $gwClientMap = [
-            'hf_x14'=>'x14_gwhf','rc_x14'=>'x14_gwrc',
-            'hf_x15'=>'x15_gwhf','rc_x15'=>'x15_gwrc',
-            'hf_x16'=>'x16_gwhf','rc_x16'=>'x16_gwrc','dev_x16'=>'x16_gwdev',
-            'hf_x17'=>'x17_gwhf','rc_x17'=>'x17_gwrc','dev_x17'=>'x17_gwdev',
-            'hf_x18'=>'x18_gwhf','rc_x18'=>'x18_gwrc','dev_x18'=>'x18_gwdev',
-        ];
-        $tableName = $gwClientMap[$testType] ?? null;
+        $tableName = $LOGG_GWCLIENT_MAP[$testType] ?? null;
     } else {
-        // gW Web : rc_x17 -> x17_rc
-        preg_match('/x\d+/', $testType, $versionMatch);
-        $version = $versionMatch[0] ?? 'x17';
-        $branch  = explode('_', $testType)[0] ?? 'rc';
-        $tableName = $version . '_' . $branch;
+        // gW Web: rc_x17 -> x17_rc
+        $tableName = $product_table_map[$testType]['gWWebSel'] ?? null;
+        if (!$tableName) {
+            // Repli si le testType n'est pas (encore) dans le mapping central
+            preg_match('/x\d+/', $testType, $versionMatch);
+            $version = $versionMatch[0] ?? 'x17';
+            $branch  = explode('_', $testType)[0] ?? 'rc';
+            $tableName = $version . '_' . $branch;
+        }
     }
 
-    // Validation du nom de table (sécurité)
+    // Table name validation (security)
     if (!$tableName || !preg_match('/^[a-z0-9_]+$/i', $tableName)) {
         throw new Exception('Impossible de résoudre la table pour Product=' . $product . ' TestType=' . $testType);
     }
 
-    // Mettre à jour la validation dans la base de données
+    // Update the validation in the database
     $stmt = $pdo->prepare("
         UPDATE `" . $tableName . "`
         SET `checked` = :checked

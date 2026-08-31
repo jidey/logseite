@@ -10,30 +10,29 @@
 	<?php
 	/**
 	 * POST.PHP
-	 * Enregistre les résultats de tests envoyés par Jenkins/TestComplete
-	 * Version PDO (config.php) avec support retry Maven :
-	 * - Single : UPDATE si JJob+JParam+Build+TCProj existe déjà (retry), INSERT sinon
-	 * - Main   : DELETE restreint au Main + INSERT (historique Single préservé)
-	 * - Historique préservé : chaque JParam distinct = exécution distincte
-																				  
+	 * Stores test results sent by Jenkins/TestComplete
+	 * PDO version (config.php) with Maven retry support:
+	 * - Single : UPDATE if JJob+JParam+Build+TCProj already exists (retry), INSERT otherwise
+	 * - Main   : DELETE restricted to Main + INSERT (Single history preserved)
+	 * - History preserved: each distinct JParam = distinct execution
 	 */
 
 	require_once '../config/config.php';
 
-	// Helper : retirer les quotes simples englobantes éventuelles
+	// Helper: strip surrounding single quotes if present
 	function unquote($value) {
 		if ($value === null) return '';
 		$value = trim($value);
-													
+
 		if (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
 			$value = substr($value, 1, -1);
 		}
 		return $value;
 	}
 
-	// Récupérer et nettoyer les paramètres GET
+	// Read and clean GET parameters
 	$JJob             = unquote($_GET['JJob'] ?? '');
-	$LogVersion       = $_GET['LogVersion'] ?? '';   // nom de table, pas de quotes
+	$LogVersion       = $_GET['LogVersion'] ?? '';   // table name, no quotes
 	$JBuild           = unquote($_GET['JBuild'] ?? '');
 	$JParam           = unquote($_GET['JParam'] ?? '');
 	$TestNode         = unquote($_GET['TestNode'] ?? '');
@@ -54,68 +53,56 @@
 	$Browser          = unquote($_GET['Browser'] ?? '');
 	$tag              = unquote($_GET['tag'] ?? '');
 	$teamtag          = unquote($_GET['teamtag'] ?? '');
-
-	// Valeurs par défaut pour tag/teamtag
+	$DBServer 		  = unquote($_GET['DBServer'] ?? '');
+	
+	// Default values for tag/teamtag
 	if ($tag === '')     $tag = '-';
 	if ($teamtag === '') $teamtag = '-';
+	if ($DBServer === '') $DBServer = 'SQL';
 
-	// Décoder le TCProj selon le produit/version (Web/SmartWe)
+	// Decode TCProj depending on product/version (Web/SmartWe)
 	$isWebOrWe = ($Product === 'gWWebSel' || $Product === 'weWebSel');
-	$webVersions = ['x17', 'x16', 'x15', 'x14', 'x13', 'x12', 'x11', 'we'];
+	$webVersions = ['x18', 'x17', 'x16', 'we'];
 
 	if ($isWebOrWe && in_array($Version, $webVersions)) {
 		$TCProj = urldecode($TCProj);
 	}
-	
-	// gWClient : pas de browser
+
+	// gWClient: no browser
 	if ($Product === 'gWClient') {
 		$Browser = '';
 	}
 
-	// Remplacer Grid par Grid-x.7 dans le LogLink
+	// Replace Grid with Grid-x.7 in the LogLink
 	$LogLink = str_replace('Grid', 'Grid-x.7', $LogLink);
 
-	// Pour gWClient : déterminer la table (LogVersion) selon le Testtype
+	// For gWClient: resolve the table (LogVersion) from the Testtype
+	// Mapping centralisé dans config/versions_config.php ($LOGG_GWCLIENT_MAP)
 	if ($Product === 'gWClient') {
-		$gwClientMap = [
-			'hf_x14'  => 'x14_gwhf',
-			'rc_x14'  => 'x14_gwrc',
-			'hf_x15'  => 'x15_gwhf',
-			'rc_x15'  => 'x15_gwrc',
-			'hf_x16'  => 'x16_gwhf',
-			'rc_x16'  => 'x16_gwrc',
-			'dev_x16' => 'x16_gwdev',
-			'hf_x17'  => 'x17_gwhf',
-			'rc_x17'  => 'x17_gwrc',
-			'dev_x17' => 'x17_gwdev',
-			'hf_x18'  => 'x18_gwhf',
-			'rc_x18'  => 'x18_gwrc',
-			'dev_x18' => 'x18_gwdev',
-		];
-		if (isset($gwClientMap[$Testtype])) {
-			$LogVersion = $gwClientMap[$Testtype];
+		if (isset($LOGG_GWCLIENT_MAP[$Testtype])) {
+			$LogVersion = $LOGG_GWCLIENT_MAP[$Testtype];
 		}
 	}
 
-	// Valider le nom de table (sécurité : seuls lettres, chiffres, underscore)
+	// Validate the table name (security: letters, digits and underscore only)
 	if (!preg_match('/^[a-z0-9_]+$/i', $LogVersion)) {
 		echo "Error: Invalid table name '" . htmlspecialchars($LogVersion) . "'";
 		exit;
 	}
 
 	try {
-														   
+
 		if ($Product === 'gWClient') {
-			// gWClient : INSERT direct (pas de retry géré, pas de tag/teamtag)
+			// gWClient: direct INSERT (no retry handling, no tag/teamtag)
 			$stmt = $pdo->prepare(
 				"INSERT INTO `$LogVersion`
 				 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
 				  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
-				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser)
+				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag, DBServer)
 				 VALUES
 				 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
 				  :failed, :canceled, :warning, :passed,
-				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser)"
+				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag, :dbserver)"
 			);
 			$stmt->execute([
 				':jjob'      => $JJob,      ':jbuild'     => $JBuild,    ':jparam'    => $JParam,
@@ -126,12 +113,12 @@
 				':rundate'   => $RunDate,   ':runduration' => $RunDuration,
 				':loglink'   => $LogLink,   ':testlogtyp' => $TestLogTyp,
 				':testtype'  => $Testtype,  ':browser'    => $Browser,
+				':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 			]);
 
-																				 
 		} elseif ($TestLogTyp === 'Single') {
-			// Scénario individuel : UPDATE si même exécution (retry), INSERT sinon
-			// Clé d'unicité : JJob + JParam + Build + TCProj
+			// Individual scenario: UPDATE if same execution (retry), INSERT otherwise
+			// Uniqueness key: JJob + JParam + Build + TCProj
 			$checkStmt = $pdo->prepare(
 				"SELECT AutoID FROM `$LogVersion`
 				 WHERE JJob = :jjob AND JParam = :jparam AND Build = :build
@@ -147,7 +134,7 @@
 			$existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
 			if ($existing) {
-				// Retry : mettre à jour uniquement les colonnes résultat
+				// Retry: update only the result columns
 				$updStmt = $pdo->prepare(
 					"UPDATE `$LogVersion`
 					 SET TearDownFailed   = :failed,
@@ -170,16 +157,16 @@
 					':autoid'      => $existing['AutoID'],
 				]);
 			} else {
-				// Nouveau run : INSERT normal
+				// New run: normal INSERT
 				$stmt = $pdo->prepare(
 					"INSERT INTO `$LogVersion`
 					 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
 					  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
-					  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag)
+					  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag, DBServer)
 					 VALUES
 					 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
 					  :failed, :canceled, :warning, :passed,
-					  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag)"
+					  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag, :dbserver)"
 				);
 				$stmt->execute([
 					':jjob'      => $JJob,      ':jbuild'      => $JBuild,    ':jparam'    => $JParam,
@@ -190,13 +177,13 @@
 					':rundate'   => $RunDate,   ':runduration' => $RunDuration,
 					':loglink'   => $LogLink,   ':testlogtyp'  => $TestLogTyp,
 					':testtype'  => $Testtype,  ':browser'     => $Browser,
-					':tag'       => $tag,       ':teamtag'     => $teamtag,
+					':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 				]);
 			}
 
 		} else {
-			// TestLogTyp = Main : DELETE restreint au Main + INSERT
-			// (le DELETE original sans TestLogTyp écrasait aussi les Single — corrigé)
+			// TestLogTyp = Main: restricted DELETE on Main + INSERT
+			// (the original DELETE without TestLogTyp also wiped Single rows - fixed)
 			$stmtDel = $pdo->prepare(
 				"DELETE FROM `$LogVersion`
 				 WHERE TCProj = :tcproj AND Build = :build AND TestLogTyp = 'Main'"
@@ -207,11 +194,11 @@
 				"INSERT INTO `$LogVersion`
 				 (JJob, JBuild, JParam, TCProj, Version, Product, gWVersion, TestNode, Build,
 				  TearDownFailed, TearDownCanceled, TearDownWarning, TearDownPassed,
-				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag)
+				  RunDate, RunDuration, LogLink, TestLogTyp, Testtype, Browser, tag, teamtag, DBServer)
 				 VALUES
 				 (:jjob, :jbuild, :jparam, :tcproj, :version, :product, :gwversion, :testnode, :build,
 				  :failed, :canceled, :warning, :passed,
-				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag)"
+				  :rundate, :runduration, :loglink, :testlogtyp, :testtype, :browser, :tag, :teamtag, :dbserver)"
 			);
 			$stmt->execute([
 				':jjob'      => $JJob,      ':jbuild'      => $JBuild,    ':jparam'    => $JParam,
@@ -222,11 +209,11 @@
 				':rundate'   => $RunDate,   ':runduration' => $RunDuration,
 				':loglink'   => $LogLink,   ':testlogtyp'  => $TestLogTyp,
 				':testtype'  => $Testtype,  ':browser'     => $Browser,
-				':tag'       => $tag,       ':teamtag'     => $teamtag,
+				':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 			]);
 		}
 
-		// Succès (silencieux)
+		// Success (silent)
 		// echo "New record added successfully";
 
 	} catch (PDOException $e) {

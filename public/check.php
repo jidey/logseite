@@ -1,24 +1,24 @@
 <?php
 /**
  * CHECK.PHP
- * Met à jour l'état "running" ou "checked" d'un test
- * Version adaptée pour LOGG (PDO + résolution de table par produit)
+ * Updates the "running" or "checked" state of a test
+ * LOGG version (PDO + per-product table resolution)
  *
- * Paramètres GET:
- * - value: valeur à écrire
+ * GET parameters:
+ * - value: value to write
  * - field: 'running' pour forcer la MAJ de running (sinon value<2 → checked, value>=2 → running)
- * - autoid: AutoID du scénario/testset
- * - Testtype + Product: pour résoudre la table (gère SmartWe → we_rc)
+ * - autoid: AutoID of the scenario/testset
+ * - Testtype + Product: used to resolve the table (handles SmartWe -> we_rc)
  * - LogVersion: nom de table direct (fallback)
  */
 
-// Empêcher tout affichage d'erreur qui corromprait le JSON
+// Suppress any error output that would corrupt the JSON
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
 header('Content-Type: application/json');
 
-// Fonction de réponse JSON propre
+// Clean JSON response helper
 function respond($success, $message, $extra = []) {
     echo json_encode(array_merge([
         'success' => $success,
@@ -44,17 +44,8 @@ $Product    = isset($_GET['Product'])    ? $_GET['Product']         : "";
 $field      = isset($_GET['field'])      ? $_GET['field']           : "";
 
 // Mapping des tables (Testtype + Product -> table)
-$tableMap = [
-    'rc_x18'  => ['gWWebSel' => 'x18_rc',  'weWebSel' => 'we_rc',  'gWClient' => 'x18_gwrc'],
-    'hf_x18'  => ['gWWebSel' => 'x18_hf',  'weWebSel' => 'we_hf',  'gWClient' => 'x18_gwhf'],
-    'dev_x18' => ['gWWebSel' => 'x18_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x18_gwdev'],
-    'rc_x17'  => ['gWWebSel' => 'x17_rc',  'weWebSel' => 'we_rc',  'gWClient' => 'x17_gwrc'],
-    'hf_x17'  => ['gWWebSel' => 'x17_hf',  'weWebSel' => 'we_hf',  'gWClient' => 'x17_gwhf'],
-    'dev_x17' => ['gWWebSel' => 'x17_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x17_gwdev'],
-    'rc_x16'  => ['gWWebSel' => 'x16_rc',  'weWebSel' => 'we_rc',  'gWClient' => 'x16_gwrc'],
-    'hf_x16'  => ['gWWebSel' => 'x16_hf',  'weWebSel' => 'we_hf',  'gWClient' => 'x16_gwhf'],
-    'dev_x16' => ['gWWebSel' => 'x16_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x16_gwdev'],
-];
+// Centralisé dans config/versions_config.php ($product_table_map, chargé via config.php)
+$tableMap = $product_table_map ?? [];
 
 // Determiner le nom de la table
 $tableName = "";
@@ -64,7 +55,7 @@ if (!empty($Testtype) && !empty($Product) && isset($tableMap[$Testtype][$Product
     $tableName = $LogVersion;
 }
 
-// Valider le nom de table (securite)
+// Validate the table name (securite)
 if (empty($tableName) || !preg_match('/^[a-z0-9_]+$/i', $tableName)) {
     respond(false, 'Invalid or missing table name', ['testtype' => $Testtype, 'product' => $Product]);
 }

@@ -1,13 +1,13 @@
 <?php
 /**
  * SYNC_MAIN.PHP
- * Recalcule et persiste les totaux (Passed/Flaky/Failed) d'un TestSet (Main)
- * à partir de ses scénarios (Single) en base.
+ * Recalculates and persists the totals (Passed/Flaky/Failed) of a TestSet (Main)
+ * from its scenarios (Single) stored in the database.
  *
- * Appelé par Jenkins après le retry, sans connaître l'AutoID :
+ * Called by Jenkins after the retry, without knowing the AutoID:
  *   sync_main.php?Testtype=dev_x16&Product=gWWebSel&JJob=Autotests-Web-Grid&JParam=lists&Build=26.3.0.16660 #3040
  *
- * Réponse JSON : { "success": true, "AutoID": 123, "passed": 10, "flaky": 2, "failed": 0 }
+ * JSON response: { "success": true, "AutoID": 123, "passed": 10, "flaky": 2, "failed": 0 }
  */
 
 header('Content-Type: application/json');
@@ -15,7 +15,7 @@ header('Content-Type: application/json');
 require_once '../config/config.php';
 require_once '../src/TestLogRepository.php';
 
-// --- Paramètres ---
+// --- Parameters ---
 $testType = $_GET['Testtype'] ?? '';
 $product  = $_GET['Product']  ?? '';
 $jJob     = $_GET['JJob']     ?? '';
@@ -23,9 +23,9 @@ $jParam   = $_GET['JParam']   ?? '';
 $build    = $_GET['Build']    ?? '';
 $testname = $_GET['TestName'] ?? '';
 
-// --- Mode Debug ---
-// Ajouter &Debug=1 à l'URL pour voir le détail des scénarios trouvés
-// sans écrire en base (aucun UPDATE n'est exécuté en mode debug)
+// --- Debug mode ---
+// Add &Debug=1 to the URL to see the details of the scenarios found
+// without writing to the database (no UPDATE is run in debug mode)
 $debug = isset($_GET['Debug']) && $_GET['Debug'] == '1';
 
 // --- Normalisation ---
@@ -39,54 +39,41 @@ if (preg_match('/^(x\d+)_(dev|rc|hf)$/', $testType, $m)) {
     $testType = $m[2] . '_' . $m[1];
 }
 
-// Normaliser we_dev / we_rc / we_hf (SmartWe)
-if ($isSmartWe) {
-    if ($testType === 'we_dev')     $testType = 'dev_x18';
-    elseif ($testType === 'we_rc')  $testType = 'rc_x17';
-    elseif ($testType === 'we_hf')  $testType = 'hf_x17';
-}
-
-// Normalisation SmartWe hf/rc → forcer version
-if ($isSmartWe) {
-    if (stripos($testType, 'hf') !== false) $testType = 'hf_x17';
-    elseif (stripos($testType, 'rc') !== false) $testType = 'rc_x17';
-}
-
 if (!$testType || !$jJob || !$jParam || !$build) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Missing required parameters (Testtype, JJob, JParam, Build)']);
     exit;
 }
 
-// --- Normalisation SmartWe (cohérent avec details.php) ---
+// --- SmartWe normalization (consistent with details.php) ---
 $isSmartWe = (strpos($product, 'weWebSel') !== false ||
               strpos($product, 'weClient') !== false ||
               strpos($product, 'smartWe')  !== false ||
               strpos($product, 'SmartWe')  !== false);
 
+// Normalize we_dev / we_rc / we_hf (SmartWe)
+// Version smartWe courante centralisée dans config/versions_config.php
+// ($SMARTWE_CURRENT_VERSION / $LOGG_SMARTWE_HF / $LOGG_SMARTWE_RC, ex: x18 / hf_x18 / rc_x18)
 if ($isSmartWe) {
-    if (stripos($testType, 'hf') !== false) {
-        $testType = 'hf_x17';
-    } elseif (stripos($testType, 'rc') !== false) {
-        $testType = 'rc_x17';
-    }
+    if ($testType === 'we_dev')     $testType = 'dev_' . $SMARTWE_CURRENT_VERSION;
+    elseif ($testType === 'we_rc')  $testType = $LOGG_SMARTWE_RC;
+    elseif ($testType === 'we_hf')  $testType = $LOGG_SMARTWE_HF;
 }
 
 try {
     $repo      = new TestLogRepository($pdo);
     $tableName = $repo->getTableForTestType($testType, $product);
 
-    // --- 1. Trouver l'AutoID de la ligne Main ---
+    // --- 1. Find the AutoID of the Main row ---
     $stmtMain = $pdo->prepare(
-        "SELECT AutoID FROM `$tableName`
-         WHERE JJob  = :jjob
-         AND   JParam = :jparam
-         AND   Build  = :build
-         AND   TestLogTyp = 'Main'
-         ORDER BY AutoID DESC
-         LIMIT 1"
-    );
-    $stmtMain->execute([':jjob' => $jJob, ':jparam' => $jParam, ':build' => $build]);
+		"SELECT AutoID FROM `$tableName`
+		 WHERE JJob  = :jjob
+		 AND   JParam = :jparam
+		 AND   TestLogTyp = 'Main'
+		 ORDER BY AutoID DESC
+		 LIMIT 1"
+	);
+	$stmtMain->execute([':jjob' => $jJob, ':jparam' => $jParam]);
     $mainRow = $stmtMain->fetch(PDO::FETCH_ASSOC);
 
     if (!$mainRow) {
@@ -128,24 +115,23 @@ try {
 		$stmtReset = $pdo->prepare($sql);
 		$stmtReset->execute($params);
 
-		// Bonus : vérifier combien de lignes ont été modifiées
-		//echo "Lignes affectées : " . $stmtReset->rowCount();
+		// Bonus: check how many rows were modified
+		//echo "Rows affected: " . $stmtReset->rowCount();
 	}
 	
-    // --- 2. Récupérer tous les scénarios (Single) de cette exécution ---
-    $stmtScen = $pdo->prepare(
-        "SELECT DISTINCT TCProj, TearDownFailed, TearDownWarning, TearDownPassed, checked, RunDate
-         FROM `$tableName`
-         WHERE JJob  = :jjob
-         AND   JParam = :jparam
-         AND   Build  = :build
-         AND   TestLogTyp = 'Single'
-         ORDER BY RunDate DESC"
-    );
-    $stmtScen->execute([':jjob' => $jJob, ':jparam' => $jParam, ':build' => $build]);
+    // --- 2. Get every scenario (Single) of this execution ---
+	$stmtScen = $pdo->prepare(
+		"SELECT DISTINCT TCProj, TearDownFailed, TearDownWarning, TearDownPassed, checked, RunDate
+		 FROM `$tableName`
+		 WHERE JJob  = :jjob
+		 AND   JParam = :jparam
+		 AND   TestLogTyp = 'Single'
+		 ORDER BY RunDate DESC"
+	);
+	$stmtScen->execute([':jjob' => $jJob, ':jparam' => $jParam]);
     $allScenarios = $stmtScen->fetchAll(PDO::FETCH_ASSOC);
 
-    // --- 3. Dédoublonner : garder le plus récent par TCProj ---
+    // --- 3. Deduplicate: keep the most recent per TCProj ---
     $scenarioMap = [];
     foreach ($allScenarios as $sc) {
         $key = $sc['TCProj'];
@@ -155,15 +141,15 @@ try {
         }
     }
 
-    // --- 4. Recalculer Passed / Flaky / Failed ---
+    // --- 4. Recalculate Passed / Flaky / Failed ---
     $calcPassed = 0;
     $calcFlaky  = 0;
     $calcFailed = 0;
-    $debugDecisions = [];   // détail TCProj => raison de la décision (mode debug uniquement)
+    $debugDecisions = [];   // TCProj detail => reason for the decision (debug mode only)
     foreach ($scenarioMap as $sc) {
         $reason = '';
         if (!empty($sc['checked'])) {
-            $calcPassed++;                          // Validé => Passed
+            $calcPassed++;                          // Validated => Passed
             $reason = 'checked=true => Passed';
         } elseif (($sc['TearDownFailed'] ?? 0) > 0) {
             $calcFailed++;
@@ -189,7 +175,7 @@ try {
         }
     }
 
-    // --- Mode Debug : retourner le détail sans écrire en base ---
+    // --- Debug mode: return the details without writing to the database ---
     if ($debug) {
         echo json_encode([
             'success'  => true,
@@ -218,7 +204,7 @@ try {
         exit;
     }
 
-    // --- 5. Persister dans la ligne Main ---
+    // --- 5. Persist into the Main row ---
     $stmtUpd = $pdo->prepare(
         "UPDATE `$tableName`
          SET TearDownPassed  = :passed,

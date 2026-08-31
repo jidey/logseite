@@ -1,3 +1,8 @@
+<?php
+// Fichier central de configuration des versions/branches (pas besoin de la
+// connexion DB ici, donc on charge uniquement versions_config.php)
+require_once __DIR__ . '/../config/versions_config.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +10,7 @@
   <title>VM Nightly Update Configuration</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Theme init (avant CSS pour éviter le flash) -->
+  <!-- Theme init (before CSS to avoid the flash) -->
   <script src="js/theme.js"></script>
 
   <!-- Bootstrap 5 CSS -->
@@ -71,8 +76,10 @@
       <!-- VMs Tab -->
       <div class="tab-pane fade show active" id="selenium" role="tabpanel" aria-labelledby="selenium-tab">
         <?php
-          $suffixes = ['dev16Deploy', 'rc16Deploy', 'hf16Deploy', 'dev17Deploy', 'rc17Deploy', 'hf17Deploy', 'dev18Deploy', 'rc18Deploy', 'hf18Deploy'];
-          $branches = ['x16dev', 'x16rc', 'x16hf', 'x17dev', 'x17rc', 'x17hf', 'x18dev', 'x18rc', 'x18hf'];
+          // Dérivé de config/versions_config.php ($LOGG_VM_BRANCHES) : ajouter
+          // une version gW Web dans ce fichier suffit à l'ajouter ici aussi.
+          $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
+          $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);
         ?>
 		<!-- Selenium VMs Tab -->
         <div class="table-responsive">
@@ -104,8 +111,10 @@
       <!-- Release VMs Tab -->
       <div class="tab-pane fade" id="release" role="tabpanel" aria-labelledby="release-tab">
 	    <?php
-          $suffixes = ['dev16Deploy', 'rc16Deploy', 'hf16Deploy', 'dev17Deploy', 'rc17Deploy', 'hf17Deploy', 'dev18Deploy', 'rc18Deploy', 'hf18Deploy'];
-          $branches = ['x16dev', 'x16rc', 'x16hf', 'x17dev', 'x17rc', 'x17hf', 'x18dev', 'x18rc', 'x18hf'];
+          // Dérivé de config/versions_config.php ($LOGG_VM_BRANCHES) : ajouter
+          // une version gW Web dans ce fichier suffit à l'ajouter ici aussi.
+          $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
+          $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);
         ?>
         <div class="table-responsive">
           <table class="table table-bordered table-striped align-middle text-center">
@@ -141,7 +150,7 @@
           <table class="table table-bordered table-striped align-middle text-center">
             <thead class="table-light">
               <tr>
-                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x17" target="_blank">Logs</a>)</th>
+                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x18" target="_blank">Logs</a>)</th>
                 <?php
                 foreach ($branches as $branch) {
 					if ($branch === 'wehf') {
@@ -173,8 +182,8 @@
 	  <!-- VMs Tab -->
       <div class="tab-pane fade" id="testcomplete" role="tabpanel" aria-labelledby="testcomplete-tab">
         <?php
-          $suffixes = ['rc16Deploy1', 'rc16Deploy2', 'rc16Deploy3', 'rc17Deploy1'];
-          $branches = ['x16rc_1', 'x16rc_2', 'x16rc_3', 'x17rc_1'];
+          $suffixes = ['hf16Deploy1', 'rc17Deploy1', 'rc17Deploy2', 'rc18Deploy1'];
+          $branches = ['x16hf_1', 'x17rc_1', 'x17rc_2', 'x18rc_1',];
         ?>
 		<!-- testcomplete VMs Tab -->
         <div class="table-responsive">

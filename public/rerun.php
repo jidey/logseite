@@ -1,11 +1,15 @@
 <?php
 /**
  * RERUN.PHP
- * Formulaire de confirmation pour relancer des tests
- * Version modernisée avec Bootstrap 5 et styles LOGG
+ * Confirmation form used to re-run tests
+ * Modernized version with Bootstrap 5 and LOGG styles
  */
 
-// Récupérer les paramètres GET
+// Fichier central de configuration des versions/branches (pas besoin de la
+// connexion DB ici, donc on charge uniquement versions_config.php)
+require_once __DIR__ . '/../config/versions_config.php';
+
+// Read the GET parameters
 $logurl = $_GET['url'] ?? "https://sqs-sel-cent1.cas-software.dev/logg/public/index.php";
 $JJob = $_GET['JJob'] ?? "";
 $JParam = $_GET['JParam'] ?? "";
@@ -18,13 +22,18 @@ $Testtype = $_GET['Testtype'] ?? "";
 $Testset = $_GET['Testset'] ?? "";
 $TCProj = $_GET['TCProj'] ?? "";
 $TestName = $_GET['TestName'] ?? "";
-$localrun = $_GET['localrun'] ?? "localrun";  // ✅ Coché par défaut
-$parallel = $_GET['parallel'] ?? "no";  // ✅ Décoché par défaut
-$retry = $_GET['retry'] ?? "retry";  // ✅ Coché par défaut
+// An unchecked checkbox sends NOTHING in the query string.
+// The "checked by default" value must therefore only apply on the initial load,
+// not when the form comes back with Confirm/Abort.
+$formSubmitted = isset($_GET['Confirm']) || isset($_GET['Abort']);
+$localrun = $_GET['localrun'] ?? ($formSubmitted ? 'no' : 'localrun');  // ✅ Checked by default
+$parallel = $_GET['parallel'] ?? 'no';                                  // ✅ Unchecked by default
+$retry    = $_GET['retry']    ?? ($formSubmitted ? 'no' : 'retry');     // ✅ Checked by default
+$DBServer = $_GET['DBServer'] ?? "SQL";  // SQL by default (SQL | PGS)
 
-// Déterminer la source d'appel (index.php ou details.php)
-// Si TCProj est présent, c'est depuis details.php (ReRun Testcase)
-// Sinon, c'est depuis index.php (Run complete TestSet)
+// Determine the calling page (index.php or details.php)
+// If TCProj is present, the call comes from details.php (ReRun Testcase)
+// Otherwise, it comes from index.php (Run complete TestSet)
 $pageTitle = !empty($TCProj) ? "ReRun Testcase" : "Run complete TestSet";
 
 // Browser
@@ -39,23 +48,23 @@ if (isset($_GET['TestBrowser'])) {
 // Hub
 $Hub = isset($_GET['Hub']) ? urlencode($_GET['Hub']) : urlencode('https://sqs-sel-cent1.cas-software.dev');
 
-// Fonction pour convertir le testType au format LogVersion correct
-// Exemples: "dev_x17" -> "x17_dev", "rc_x17" -> "x17_rc"
+// Helper converting the testType into the correct LogVersion format
+// Examples: "dev_x17" -> "x17_dev", "rc_x17" -> "x17_rc"
 function formatLogVersion($input) {
     if (empty($input)) {
         return "x17_dev";
     }
     
-    // Si c'est déjà au bon format (contient "_"), vérifier et corriger si nécessaire
+    // If it already has the right shape (contains "_"), check and fix it if needed
     if (strpos($input, '_') !== false) {
         $parts = explode('_', $input);
         if (count($parts) === 2) {
-            // Vérifier si c'est au format {version}_{branch} (bon) ou {branch}_{version} (mauvais)
+            // Check whether it is {version}_{branch} (good) or {branch}_{version} (bad)
             if (preg_match('/^x\d+/', $parts[0])) {
-                // Bon format: x17_dev
+                // Good format: x17_dev
                 return $input;
             } else if (preg_match('/^x\d+/', $parts[1])) {
-                // Mauvais format: dev_x17, il faut inverser
+                // Bad format: dev_x17, swap the parts
                 return $parts[1] . '_' . $parts[0];
             }
         }
@@ -64,7 +73,7 @@ function formatLogVersion($input) {
     return $input;
 }
 
-// Déterminer le LogVersion s'il n'est pas fourni
+// Determine the LogVersion when it is not provided
 if (empty($LogVersion)) {
     if (!empty($Testtype)) {
         $LogVersion = formatLogVersion($Testtype);
@@ -72,7 +81,7 @@ if (empty($LogVersion)) {
         $LogVersion = "x17_dev";
     }
 } else {
-    // LogVersion est fourni, s'assurer qu'il est au bon format
+    // LogVersion is provided, make sure it has the right format
     $LogVersion = formatLogVersion($LogVersion);
 }
 
@@ -80,7 +89,7 @@ if (empty($LogVersion)) {
 $JJobJenkins = "SQS_Web_TestPipe";
 $ForDebug = 'false';
 
-// Construire l'URL de test
+// Build the test URL
 if ($Testset == $JParam && empty($TCProj)) {
 	$JParam = "@dummy";
     $test = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins . 
@@ -101,7 +110,7 @@ if ($Testset == $JParam && empty($TCProj)) {
     
 }
 
-// Ajouter le Product
+// Append the Product
 if ($Product == "weWebSel") {
     $test = $test . "&Product=We";
 } elseif ($Product == "gWWebSel") {
@@ -110,9 +119,9 @@ if ($Product == "weWebSel") {
     $test = $test . "&Product=error";
 }
 
-// Construire l'URL de vérification du test
-// check.php résout la table via Testtype + Product (gère SmartWe → we_rc)
-// check.php est en local dans logg/public/
+// Build the test check URL
+// check.php resolves the table from Testtype + Product (handles SmartWe -> we_rc)
+// check.php lives locally in logg/public/
 $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'sqs-sel-cent1.cas-software.dev';
 $basePath = dirname($_SERVER['PHP_SELF'] ?? '/logg/public/rerun.php');
@@ -122,40 +131,37 @@ $runn = $protocol . "://" . $host . $basePath . "/check.php?value=2" .
         "&Testtype=" . urlencode($Testtype) .
         "&Product=" . urlencode($Product);
 
-$execute = isset($_GET['Confirm']) || isset($_GET['Abort']);
+$execute = $formSubmitted;
 
-// Gérer les actions
+// Handle the actions
 if ($execute) {
     if (isset($_GET['Confirm'])) {
-        // Déterminer le nœud de test selon la version
-        // Chaque version a son propre paramètre (Test_Node, Test_x17, Test_x16, Test_x15, Test_x14)
-        $Test_x = 'Grid'; // Défaut
-        
-		if (substr($LogVersion, 0, 2) == "we") {
+        // Determine the test node depending on the version.
+        // Each version has its own parameter (Test_Node pour smartWe,
+        // Test_x17, Test_x18, ... pour gW Web/Desktop). Le nom du paramètre
+        // est déduit dynamiquement du numéro de version présent dans
+        // $LogVersion (ex: "x19_dev" -> "Test_x19") : aucune modification
+        // n'est nécessaire ici lors de l'ajout d'une nouvelle version, voir
+        // runsystems.php qui génère le champ correspondant.
+        $Test_x = 'Grid'; // Default
+
+        if (substr($LogVersion, 0, 2) == "we") {
             $Test_x = $_GET['Test_Node'] ?? 'Grid';
-        } elseif (substr($LogVersion, 0, 3) == "x18") {
-            $Test_x = $_GET['Test_x18'] ?? 'Grid';
-		} elseif (substr($LogVersion, 0, 3) == "x17") {
-            $Test_x = $_GET['Test_x17'] ?? 'Grid';
-        } elseif (substr($LogVersion, 0, 3) == "x16") {
-            $Test_x = $_GET['Test_x16'] ?? 'Grid';
-        } elseif (substr($LogVersion, 0, 3) == "x15") {
-            $Test_x = $_GET['Test_x15'] ?? 'Grid';
-        } elseif (substr($LogVersion, 0, 3) == "x14") {
-            $Test_x = $_GET['Test_x14'] ?? 'Grid';
+        } elseif (preg_match('/x\d+/', $LogVersion, $verMatch)) {
+            $Test_x = $_GET['Test_' . $verMatch[0]] ?? 'Grid';
         }
-        
+
 		ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug, 
-                     $localrun, $parallel, $Build, $retry);
+                     $localrun, $parallel, $Build, $retry, $DBServer);
     } elseif (isset($_GET['Abort'])) {
         header("Location: " . $logurl);
         exit;
     }
 } else {
-    // Afficher le formulaire de confirmation
+    // Display the confirmation form
     ?>
     <!DOCTYPE html>
-    <html lang="fr">
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -171,10 +177,10 @@ if ($execute) {
             } else {
                 isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             }
-            // Poser data-theme sur <html> (existe déjà, pas de flash)
+            // Set data-theme on <html> (it already exists, so no flash)
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             window.initialTheme = isDark ? 'dark' : 'light';
-            // Appliquer la classe sur body dès qu'il est disponible
+            // Apply the class on body as soon as it is available
             document.addEventListener('DOMContentLoaded', function() {
                 if (isDark) {
                     document.body.classList.add('dark-mode');
@@ -207,13 +213,20 @@ if ($execute) {
                 --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             
+			/* Dark variables applied early via data-theme (prevents the flash) */
 			html[data-theme="dark"] {
                 --bg-primary: #1a1a1a;
                 --bg-secondary: #2d2d2d;
                 --bg-tertiary: #3a3a3a;
                 --text-primary: #e4e4e4;
                 --text-secondary: #b0b0b0;
-                /* ... recopier EXACTEMENT les mêmes variables que body.dark-mode ... */
+                --text-muted: #808080;
+                --border-color: #444;
+                --border-light: rgba(255,255,255,.1);
+                --input-bg: #3a3a3a;
+                --input-border: #555;
+                --input-focus-border: #4a9eff;
+                --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
             html[data-theme="dark"] body {
                 background: var(--bg-primary) !important;
@@ -238,6 +251,10 @@ if ($execute) {
             body {
                 background: var(--bg-primary) !important;
                 color: var(--text-primary) !important;
+            }
+            
+            /* Transitions only kick in after the first paint (no load flash) */
+            body.theme-ready {
                 transition: background-color 0.3s ease, color 0.3s ease;
             }
             
@@ -288,12 +305,11 @@ if ($execute) {
             .btn-outline-secondary:hover {
                 background: var(--bg-tertiary) !important;
             }
-            body { background: #f8f9fa; }
             .rerun-container { max-width: 700px; margin: 40px auto; }
             .rerun-card { 
-                background: white; 
+                background: var(--bg-secondary); 
                 border-radius: 8px; 
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                box-shadow: var(--card-shadow);
                 padding: 30px;
             }
             .rerun-card h2 { 
@@ -302,8 +318,6 @@ if ($execute) {
                 font-size: 1.8rem;
             }
             .rerun-info {
-                background: #f8f9fa;
-                border-left: 4px solid #007bff;
                 padding: 20px;
                 margin: 20px 0;
                 border-radius: 4px;
@@ -363,7 +377,7 @@ if ($execute) {
                 font-size: 12px;
             }
             
-            /* Vert clair quand coché */
+            /* Light green when checked */
             .form-check input[type="checkbox"]:checked {
                 background-color: #28a745 !important;
             }
@@ -390,7 +404,7 @@ if ($execute) {
         </style>
     </head>
     <body>
-        <!-- Header avec Theme Toggle -->
+        <!-- Header with the Theme Toggle -->
         <div class="rerun-container">
             <div class="rerun-card">
                 <h2>🔄 <?php echo $pageTitle; ?></h2>
@@ -443,6 +457,16 @@ if ($execute) {
                                 <small>Retry failing tests</small>
                             </label>
                         </div>
+						<div class="form-check" style="grid-column: 1 / -1;">
+                            <label class="form-check-label" for="DBServer" style="width:100%;">
+                                <strong>DB Server</strong><br>
+                                <small>Database backend</small>
+                            </label>
+                            <select class="form-select" id="DBServer" name="DBServer" style="margin-top:8px; max-width:200px;">
+                                <option value="SQL" <?php echo ($DBServer === 'SQL') ? 'selected' : ''; ?>>SQL</option>
+                                <option value="PGS" <?php echo ($DBServer === 'PGS') ? 'selected' : ''; ?>>PGS</option>
+                            </select>
+                        </div>
                     </div>					
                     <!-- Hidden fields -->
                     <input type="hidden" name="JJob" value="<?php echo htmlspecialchars($JJob); ?>">
@@ -476,26 +500,26 @@ if ($execute) {
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         
         <script>
-            // Mettre à jour les couleurs au chargement
+            // Update the colors on page load
             document.addEventListener('DOMContentLoaded', function() {
                 updateCheckboxColors();
                 
-                // Ajouter les event listeners pour tous les checkboxes
+                // Add the event listeners for every checkbox
                 document.querySelectorAll('.form-check input[type="checkbox"]').forEach(checkbox => {
                     checkbox.addEventListener('change', updateCheckboxColors);
                 });
             });
             
-            // Fonction pour mettre à jour les couleurs
+            // Update the checkbox colors
             function updateCheckboxColors() {
                 document.querySelectorAll('.form-check').forEach(formCheck => {
                     const checkbox = formCheck.querySelector('input[type="checkbox"]');
                     if (checkbox) {
                         if (checkbox.checked) {
-                            formCheck.style.backgroundColor = '#d4edda';  // Vert clair
+                            formCheck.style.backgroundColor = '#d4edda';  // Light green
                             formCheck.style.borderColor = '#28a745';
                         } else {
-                            formCheck.style.backgroundColor = '#f5f5f5';  // Gris clair
+                            formCheck.style.backgroundColor = '#f5f5f5';  // Light grey
                             formCheck.style.borderColor = '#dee2e6';
                         }
                     }
@@ -507,6 +531,13 @@ if ($execute) {
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 updateThemeButton();
+                
+                // Enable transitions AFTER the first paint (avoids the load flash)
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        document.body.classList.add('theme-ready');
+                    });
+                });
             });
 
             function updateThemeButton() {
@@ -528,24 +559,21 @@ if ($execute) {
                 const isDarkMode = document.body.classList.contains('dark-mode');
                 
                 if (isDarkMode) {
+                    // Switch to light mode
                     document.body.classList.remove('dark-mode');
                     document.body.classList.add('light-mode');
+                    document.documentElement.setAttribute('data-theme', 'light');
                     localStorage.setItem('logg-theme', 'light');
                 } else {
+                    // Switch to dark mode
                     document.body.classList.add('dark-mode');
                     document.body.classList.remove('light-mode');
+                    document.documentElement.setAttribute('data-theme', 'dark');
                     localStorage.setItem('logg-theme', 'dark');
                 }
                 
                 updateThemeButton();
             }
-			
-			requestAnimationFrame(function() {
-                requestAnimationFrame(function() {
-                    document.body.classList.add('theme-ready');
-                });
-            });
-
         </script>
     </body>
     </html>
@@ -553,43 +581,33 @@ if ($execute) {
 }
 
 /**
- * Confirmer et lancer le test
+ * Confirm and launch the test
  */
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry) {
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer) {
     $Test_y = "&Test_Node=" . $Test_x;
+
+    // Map the branches (testType -> branche Git Jenkins)
+    // Mapping centralisé dans config/versions_config.php ($LOGG_JENKINS_BRANCH_MAP)
+    global $LOGG_JENKINS_BRANCH_MAP;
+    $branch = $LOGG_JENKINS_BRANCH_MAP[$branch] ?? $branch;
     
-    // Mapper les branches
-    $branchMap = [
-        'hf_x15' => 'hotfix/11.x',
-        'dev_x16' => 'dev/12.x',
-        'rc_x16' => 'rc/12.x',
-        'hf_x16' => 'hotfix/12.x',
-        'dev_x17' => 'dev/13.x',
-        'rc_x17' => 'rc/13.x',
-        'hf_x17' => 'hotfix/13.x',
-        'dev_x18' => 'dev/14.x',
-        'rc_x18' => 'rc/14.x',
-        'hf_x18' => 'hotfix/14.x',
-        'we_dev' => 'dev/14.x',
-        'we_rc' => 'rc/13.x',
-        'we_hf' => 'hotfix/13.x',
-    ];
-    
-    $branch = $branchMap[$branch] ?? $branch;
-    
-    // Construire l'URL de test avec les paramètres
+    // Build the test URL with its parameters
     $test = $test . "&Test_Version=" . $branch . $Test_y . "&TestBrowser=" . $Browser;
     
     if (!empty($Build)) {
         $test = $test . "&TestedBuild=" . urlencode($Build);
     }
     
+	if (!empty($DBServer)) {
+        $test = $test . "&DBServer=" . urlencode($DBServer);
+    }
+	
     if ($forDebug === 'true') {
         $feature = substr($JJob, 14, strlen($JJob));
         $test = $test . "&Feature=" . $feature;
     }
     
-    // Sélectionner le hub
+    // Select the hub
     if ($Test_x !== "JDF" && $Test_x !== "SV" && $Test_x !== "OG" && $Test_x !== "AS" && $Test_x !== "Grid") {
         $Hub = "http://sqs-gridhub1";
     } else {
@@ -598,7 +616,7 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     
     $test = $test . "&Hub=" . $Hub;
     
-    // Options d'exécution
+	// Execution options
     if ($localrun === 'localrun') {
         $test = $test . "&LocalBrower=true";
     } else {
@@ -613,16 +631,16 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
         $test = $test . "&RETRY_FAILED=true";
     }
     
-    // Envoyer les requêtes via GET (Jenkins utilise les paramètres d'URL/query string)
-    // Comme quand on colle l'URL directement dans le navigateur
+    // Send the requests via GET (Jenkins reads the URL/query string parameters)
+    // Just like pasting the URL directly into the browser
     
-    // Fonction pour envoyer une requête GET
+    // Helper sending a GET request
     function sendGetRequest($url) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPGET, true);          // Méthode GET
+        curl_setopt($ch, CURLOPT_HTTPGET, true);          // GET method
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    // Suivre les redirections
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    // Follow the redirects
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
@@ -635,13 +653,13 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
         return ['code' => $httpCode, 'response' => $response, 'error' => $error];
     }
     
-    // Envoyer la requête de vérification (check.php : met running=2)
+    // Send the check request (check.php: sets running=2)
     @sendGetRequest($runn);
     
-    // Envoyer la requête de test à Jenkins
+    // Send the test request to Jenkins
     @sendGetRequest($test);
     
-    // Rediriger vers le log
+    // Redirect back to the log
     header("Location: " . $logurl);
     exit;
 }

@@ -32,12 +32,12 @@ class TestLogRepository {
                 'rc_x17' => ['gWWebSel' => 'x17_rc', 'weWebSel' => 'we_rc', 'gWClient' => 'x17_gwrc'],
                 'hf_x17' => ['gWWebSel' => 'x17_hf', 'weWebSel' => 'we_hf', 'gWClient' => 'x17_gwhf'],
                 'dev_x17' => ['gWWebSel' => 'x17_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x17_gwdev'],
-                'rc_x16' => ['gWWebSel' => 'x16_rc', 'weWebSel' => 'we_rc', 'gWClient' => 'x16_gwrc'],
+                //'rc_x16' => ['gWWebSel' => 'x16_rc', 'weWebSel' => 'we_rc', 'gWClient' => 'x16_gwrc'],
                 'hf_x16' => ['gWWebSel' => 'x16_hf', 'weWebSel' => 'we_hf', 'gWClient' => 'x16_gwhf'],
-                'dev_x16' => ['gWWebSel' => 'x16_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x16_gwdev'],
-                'rc_x15' => ['gWWebSel' => 'x15_rc',  'weWebSel' => 'we_rc', 'gWClient' => 'x15_gwrc'],
-                'hf_x15' => ['gWWebSel' => 'x15_hf', 'weWebSel' => 'we_hf', 'gWClient' => 'x15_gwhf'],
-                'dev_x15' => ['gWWebSel' => 'x15_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x15_gwdev'],
+                //'dev_x16' => ['gWWebSel' => 'x16_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x16_gwdev'],
+                //'rc_x15' => ['gWWebSel' => 'x15_rc',  'weWebSel' => 'we_rc', 'gWClient' => 'x15_gwrc'],
+                //'hf_x15' => ['gWWebSel' => 'x15_hf', 'weWebSel' => 'we_hf', 'gWClient' => 'x15_gwhf'],
+                //'dev_x15' => ['gWWebSel' => 'x15_dev', 'weWebSel' => 'we_dev', 'gWClient' => 'x15_gwdev'],
             ];
         }
     }
@@ -450,42 +450,16 @@ class TestLogRepository {
             return $availableTestTypes;
         }
         
-        // Pour chaque version, vérifier si le produit existe et s'il y a des données
+        // Pour chaque version, vérifier si le produit existe dans le mapping.
+        // Depuis la centralisation (config/versions_config.php), une branche
+        // marquée 'active'/'future' pour ce produit est affichée directement,
+        // sans requête de comptage : plus besoin d'attendre que des données
+        // existent en base pour qu'une version nouvellement ajoutée apparaisse
+        // dans le sélecteur (voir config/versions_config.php pour le statut
+        // de chaque branche : 'active' | 'future' | 'retired').
         foreach ($this->product_table_map as $testType => $products) {
             if (isset($products[$product])) {
-                // Vérifier s'il y a des données pour ce TestType + Product
-                try {
-                    $tableName = $products[$product];
-                    
-                    // Pour weWebSel, utiliser le nom de la table comme Testtype
-                    $dbTestType = $testType;
-                    if ($product == "weWebSel") {
-                        $dbTestType = $tableName;
-                    }
-                    
-                    $query = "SELECT COUNT(*) as count FROM `$tableName` 
-                              WHERE TestLogTyp = 'Main' 
-                              AND Testtype = :testtype
-                              AND Product = :product
-                              LIMIT 1";
-                    
-                    $stmt = $this->pdo->prepare($query);
-                    $stmt->bindValue(':testtype', $dbTestType, PDO::PARAM_STR);
-                    $stmt->bindValue(':product', $product, PDO::PARAM_STR);
-                    $stmt->execute();
-                    
-                    $result = $stmt->fetch();
-                    
-                    // Si des données existent, ajouter ce TestType
-                    // OU si c'est une version X18/X17 (toujours afficher les versions récentes)
-                    if ((!empty($result) && $result['count'] > 0) || 
-                        preg_match('/(x18|x17)/', $testType)) {
-                        $availableTestTypes[] = $testType;
-                    }
-                } catch (Exception $e) {
-                    // Ignorer les erreurs, continuer
-                    error_log("Error checking available TestTypes: " . $e->getMessage());
-                }
+                $availableTestTypes[] = $testType;
             }
         }
         
