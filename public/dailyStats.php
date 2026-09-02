@@ -8,14 +8,14 @@ $Branch  = isset($_GET['Branch'])  ? $_GET['Branch']  : '';
 $table   = isset($_GET['table'])   ? $_GET['table']   : '';
 $analyse = isset($_GET['analyse']) ? $_GET['analyse'] : '';
 
-// Valider le nom de table (sécurité : il ne peut pas être paramétré dans une requête préparée)
+// Validate the table name (security: it cannot be parameterized in a prepared statement)
 if (!preg_match('/^[a-z0-9_]+$/i', $table)) {
     echo "Error: invalid table name";
     exit;
 }
 
 if (!isset($pdo)) {
-    echo "Error: connexion PDO non disponible";
+    echo "Error: PDO connection not available";
     exit;
 }
 

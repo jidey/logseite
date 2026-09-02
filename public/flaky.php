@@ -1,8 +1,8 @@
 <?php
 /**
  * FLAKY.PHP
- * Appelé par Jenkins en fin de test : marque le dernier run d'un TCProj comme Flaky
- * (retry réussi). Met TearDownWarning=1, TearDownFailed=0.
+ * Called by Jenkins at the end of a test: marks the last run of a TCProj as Flaky
+ * (successful retry). Sets TearDownWarning=1, TearDownFailed=0.
  */
 header('Content-Type: application/json; charset=utf-8');
 
@@ -19,14 +19,14 @@ try {
 }
 
 if (!isset($pdo)) {
-    respond(false, 'Connexion PDO non disponible');
+    respond(false, 'PDO connection not available');
 }
 
 $LogVersion = $_GET['LogVersion'] ?? '';
 $TCProj     = $_GET['TCProj'] ?? '';
 
-// Jenkins/TestComplete envoie parfois les valeurs entourées de quotes simples
-// ex: 'User Validates...' -> retirer la paire de quotes englobantes
+// Jenkins/TestComplete sometimes sends values surrounded by single quotes
+// e.g. 'User Validates...' -> strip the surrounding pair of quotes
 $LogVersion = trim($LogVersion);
 if (strlen($LogVersion) >= 2 && $LogVersion[0] === "'" && substr($LogVersion, -1) === "'") {
     $LogVersion = substr($LogVersion, 1, -1);
@@ -36,28 +36,28 @@ if (strlen($TCProj) >= 2 && $TCProj[0] === "'" && substr($TCProj, -1) === "'") {
     $TCProj = substr($TCProj, 1, -1);
 }
 
-// Valider le nom de table (sécurité - pas de backtick/injection)
+// Validate the table name (security - no backtick/injection)
 if (!preg_match('/^[a-z0-9_]+$/i', $LogVersion)) {
     respond(false, 'Invalid table name: ' . $LogVersion);
 }
 if ($TCProj === '') {
-    respond(false, 'TCProj manquant');
+    respond(false, 'Missing TCProj');
 }
 
 try {
-    // Trouver le dernier run de ce TCProj (+ JJob/JParam pour retrouver le TestSet parent)
+    // Find the last run of this TCProj (+ JJob/JParam to find the parent TestSet)
     $sel = $pdo->prepare("SELECT AutoID, JJob, JParam FROM `$LogVersion` WHERE TCProj = :tcproj ORDER BY AutoID DESC LIMIT 1");
     $sel->execute([':tcproj' => $TCProj]);
     $row = $sel->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
-        respond(false, 'Aucun run trouvé pour TCProj=' . $TCProj . ' dans ' . $LogVersion);
+        respond(false, 'No run found for TCProj=' . $TCProj . ' in ' . $LogVersion);
     }
     $id     = $row['AutoID'];
     $jjob   = $row['JJob'];
     $jparam = $row['JParam'];
 
-    // Marquer comme Flaky : Warning=1 ET Failed=0 (sinon le scénario compte double)
+    // Mark as Flaky: Warning=1 AND Failed=0 (otherwise the scenario counts twice)
     $upd = $pdo->prepare("
         UPDATE `$LogVersion`
         SET `TearDownWarning` = 1,
@@ -66,8 +66,8 @@ try {
     ");
     $upd->execute([':autoid' => $id]);
 
-	// ===== Recalculer les totaux du TestSet (ligne Main) =====
-    // Récupérer le dernier scénario (Single) de chaque TCProj pour ce TestSet
+	// ===== Recalculate the TestSet totals (Main row) =====
+    // Get the last scenario (Single) of each TCProj for this TestSet
     $scenSql = "SELECT s.TearDownFailed, s.TearDownWarning, s.checked
                 FROM `$LogVersion` s
                 INNER JOIN (
@@ -83,17 +83,17 @@ try {
     $calcPassed = 0; $calcFlaky = 0; $calcFailed = 0;
     foreach ($scenarios as $sc) {
         if (!empty($sc['checked'])) {
-            $calcPassed++;                          // validé => Passed
+            $calcPassed++;                          // validated => Passed
         } elseif (($sc['TearDownFailed'] ?? 0) > 0) {
             $calcFailed++;
         } elseif (($sc['TearDownWarning'] ?? 0) > 0) {
-            $calcFlaky++;                           // Flaky compté
+            $calcFlaky++;                           // Flaky counted
         } else {
             $calcPassed++;
         }
     }
 
-    // Trouver l'AutoID de la ligne Main la PLUS RÉCENTE (le dernier TestSet)
+    // Find the AutoID of the MOST RECENT Main row (the latest TestSet)
     $mainSel = $pdo->prepare("
         SELECT AutoID FROM `$LogVersion`
         WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Main'
@@ -106,7 +106,7 @@ try {
     if ($mainRow) {
         $mainAutoID = $mainRow['AutoID'];
 
-        // Mettre à jour UNIQUEMENT ce TestSet (le dernier)
+        // Update ONLY this TestSet (the latest one)
         $updMain = $pdo->prepare("
             UPDATE `$LogVersion`
             SET `TearDownPassed`  = :passed,

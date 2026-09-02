@@ -28,13 +28,13 @@ $testname = $_GET['TestName'] ?? '';
 // without writing to the database (no UPDATE is run in debug mode)
 $debug = isset($_GET['Debug']) && $_GET['Debug'] == '1';
 
-// --- Normalisation ---
+// --- Normalization ---
 $isSmartWe = (strpos($product, 'weWebSel') !== false ||
               strpos($product, 'weClient') !== false ||
               strpos($product, 'smartWe')  !== false ||
               strpos($product, 'SmartWe')  !== false);
 
-// Normaliser x16_dev → dev_x16
+// Normalize x16_dev → dev_x16
 if (preg_match('/^(x\d+)_(dev|rc|hf)$/', $testType, $m)) {
     $testType = $m[2] . '_' . $m[1];
 }
@@ -52,8 +52,8 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
               strpos($product, 'SmartWe')  !== false);
 
 // Normalize we_dev / we_rc / we_hf (SmartWe)
-// Version smartWe courante centralisée dans config/versions_config.php
-// ($SMARTWE_CURRENT_VERSION / $LOGG_SMARTWE_HF / $LOGG_SMARTWE_RC, ex: x18 / hf_x18 / rc_x18)
+// Current smartWe version centralized in config/versions_config.php
+// ($SMARTWE_CURRENT_VERSION / $LOGG_SMARTWE_HF / $LOGG_SMARTWE_RC, e.g. x18 / hf_x18 / rc_x18)
 if ($isSmartWe) {
     if ($testType === 'we_dev')     $testType = 'dev_' . $SMARTWE_CURRENT_VERSION;
     elseif ($testType === 'we_rc')  $testType = $LOGG_SMARTWE_RC;
@@ -109,7 +109,7 @@ try {
 			':testname' => $testname."%"
 		];
 
-		// Affichage debug
+		// Debug display
 		//echo debugQuery($sql, $params);
 
 		$stmtReset = $pdo->prepare($sql);
@@ -180,7 +180,7 @@ try {
         echo json_encode([
             'success'  => true,
             'debug'    => true,
-            'note'     => 'Mode debug actif : aucune écriture en base (UPDATE non exécuté)',
+            'note'     => 'Debug mode active: no database write (UPDATE not executed)',
             'AutoID'   => $autoID,
             'table'    => $tableName,
             'testType' => $testType,

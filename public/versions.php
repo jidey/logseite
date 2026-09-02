@@ -11,7 +11,7 @@ foreach ($files as $file) {
 
         if (is_file($filePath)) {
             $fileContent = file_get_contents($filePath);
-            // Supposons que la version est sur la première ligne du fichier
+            // Assume the version is on the first line of the file
             $version = trim(strtok($fileContent, "\n"));
 
             $results[] = [
@@ -26,7 +26,7 @@ foreach ($files as $file) {
 
         if (is_file($filePath)) {
             $fileContent = file_get_contents($filePath);
-            // Supposons que la version est sur la première ligne du fichier
+            // Assume the version is on the first line of the file
             $version = trim(strtok($fileContent, "\n"));
 			$version = "we " . strtoupper(substr($buildNumber, 2)) . " #".substr($version, 0, 6); 
 			
@@ -45,7 +45,7 @@ file_put_contents($jsonFilePath, json_encode($results, JSON_PRETTY_PRINT));
 ?>
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Deployed Build Number</title>

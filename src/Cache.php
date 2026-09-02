@@ -1,51 +1,51 @@
 <?php
 /**
  * CACHE.PHP
- * Gestionnaire de cache simple basé sur les fichiers
- * Utilisé pour mettre en cache les requêtes DB fréquentes
+ * Simple file-based cache manager
+ * Used to cache frequent DB queries
  */
 
 class Cache {
     private $cacheDir;
-    private $defaultTTL = 300; // 5 minutes par défaut
-    
+    private $defaultTTL = 300; // 5 minutes by default
+
     /**
-     * Constructeur
-     * @param string $cacheDir Répertoire du cache (par défaut /tmp)
+     * Constructor
+     * @param string $cacheDir Cache directory (default /tmp)
      */
     public function __construct($cacheDir = null) {
         if ($cacheDir === null) {
             $cacheDir = sys_get_temp_dir() . '/logg_cache';
         }
-        
+
         $this->cacheDir = $cacheDir;
-        
-        // Créer le répertoire s'il n'existe pas
+
+        // Create the directory if it doesn't exist
         if (!is_dir($this->cacheDir)) {
             @mkdir($this->cacheDir, 0755, true);
         }
     }
     
     /**
-     * Récupérer une valeur du cache
-     * @param string $key Clé du cache
-     * @return mixed|null Valeur en cache ou null si expiré/inexistant
+     * Get a value from the cache
+     * @param string $key Cache key
+     * @return mixed|null Cached value or null if expired/nonexistent
      */
     public function get($key) {
         $file = $this->getCacheFile($key);
-        
+
         if (!file_exists($file)) {
             return null;
         }
-        
-        // Vérifier si le cache est expiré
+
+        // Check whether the cache is expired
         $cacheData = json_decode(file_get_contents($file), true);
-        
+
         if (!$cacheData || !isset($cacheData['expire'])) {
             return null;
         }
-        
-        // Si expiré, retourner null et supprimer le fichier
+
+        // If expired, return null and delete the file
         if (time() > $cacheData['expire']) {
             @unlink($file);
             return null;
@@ -55,11 +55,11 @@ class Cache {
     }
     
     /**
-     * Sauvegarder une valeur en cache
-     * @param string $key Clé du cache
-     * @param mixed $value Valeur à cacher
-     * @param int $ttl Durée de vie en secondes (par défaut 300 = 5min)
-     * @return bool Succès de la sauvegarde
+     * Save a value into the cache
+     * @param string $key Cache key
+     * @param mixed $value Value to cache
+     * @param int $ttl Time to live in seconds (default 300 = 5min)
+     * @return bool Whether the save succeeded
      */
     public function set($key, $value, $ttl = null) {
         if ($ttl === null) {
@@ -81,27 +81,27 @@ class Cache {
     }
     
     /**
-     * Vérifier si une clé existe et n'est pas expiré
-     * @param string $key Clé du cache
+     * Check whether a key exists and is not expired
+     * @param string $key Cache key
      * @return bool
      */
     public function has($key) {
         return $this->get($key) !== null;
     }
-    
+
     /**
-     * Supprimer une clé du cache
-     * @param string $key Clé du cache
+     * Delete a key from the cache
+     * @param string $key Cache key
      * @return bool
      */
     public function delete($key) {
         $file = $this->getCacheFile($key);
         return @unlink($file);
     }
-    
+
     /**
-     * Vider tout le cache
-     * @return int Nombre de fichiers supprimés
+     * Clear the entire cache
+     * @return int Number of files deleted
      */
     public function flush() {
         $count = 0;
@@ -117,7 +117,7 @@ class Cache {
     }
     
     /**
-     * Obtenir le statut du cache (info de debug)
+     * Get the cache status (debug info)
      * @return array
      */
     public function getStats() {
@@ -149,8 +149,8 @@ class Cache {
     }
     
     /**
-     * Nettoyer les fichiers de cache expiré
-     * @return int Nombre de fichiers supprimés
+     * Clean up expired cache files
+     * @return int Number of files deleted
      */
     public function cleanup() {
         $count = 0;
@@ -170,12 +170,12 @@ class Cache {
     }
     
     /**
-     * Obtenir le chemin du fichier cache
+     * Get the cache file path
      * @param string $key
      * @return string
      */
     private function getCacheFile($key) {
-        // Sanitize le nom de fichier
+        // Sanitize the file name
         $filename = md5($key) . '.cache';
         return $this->cacheDir . '/' . $filename;
     }

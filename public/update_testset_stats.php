@@ -15,13 +15,13 @@ try {
     $product  = $_POST['Product'] ?? '';
 
     if (!$autoID) {
-        throw new Exception('AutoID manquant');
+        throw new Exception('Missing AutoID');
     }
     if (!$testType) {
-        throw new Exception('TestType manquant');
+        throw new Exception('Missing TestType');
     }
     if (!isset($pdo)) {
-        throw new Exception('Connexion PDO non disponible');
+        throw new Exception('PDO connection not available');
     }
 
     // Table resolution (same logic as update_validation.php)
@@ -30,7 +30,7 @@ try {
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
-    // Mapping centralisé dans config/versions_config.php (chargé via config.php)
+    // Centralized mapping in config/versions_config.php (loaded via config.php)
     if ($isSmartWe) {
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';
         elseif (stripos($testType, 'rc') !== false)  $tableName = 'we_rc';
@@ -40,7 +40,7 @@ try {
     } else {
         $tableName = $product_table_map[$testType]['gWWebSel'] ?? null;
         if (!$tableName) {
-            // Repli si le testType n'est pas (encore) dans le mapping central
+            // Fallback if the testType is not (yet) in the central mapping
             preg_match('/x\d+/', $testType, $versionMatch);
             $version = $versionMatch[0] ?? 'x17';
             $branch  = explode('_', $testType)[0] ?? 'rc';
@@ -49,14 +49,14 @@ try {
     }
 
     if (!$tableName || !preg_match('/^[a-z0-9_]+$/i', $tableName)) {
-        throw new Exception('Impossible de résoudre la table pour Product=' . $product . ' TestType=' . $testType);
+        throw new Exception('Unable to resolve the table for Product=' . $product . ' TestType=' . $testType);
     }
 
     // Check that the row exists
     $check = $pdo->prepare("SELECT AutoID FROM `" . $tableName . "` WHERE AutoID = :autoID LIMIT 1");
     $check->execute([':autoID' => $autoID]);
     if (!$check->fetch(PDO::FETCH_ASSOC)) {
-        throw new Exception('TestSet avec AutoID ' . $autoID . ' non trouvé dans ' . $tableName);
+        throw new Exception('TestSet with AutoID ' . $autoID . ' not found in ' . $tableName);
     }
 
     // Update Passed (TearDownPassed), Flaky (TearDownWarning) and Failed (TearDownFailed)
@@ -90,12 +90,12 @@ try {
     }
 
     if (!$result) {
-        throw new Exception('Erreur lors de la mise à jour: ' . implode(', ', $updateStmt->errorInfo()));
+        throw new Exception('Error while updating: ' . implode(', ', $updateStmt->errorInfo()));
     }
 
     echo json_encode([
         'success'       => true,
-        'message'       => 'Stats du TestSet mises à jour avec succès',
+        'message'       => 'TestSet stats updated successfully',
         'table'         => $tableName,
         'rows_affected' => $updateStmt->rowCount(),
         'stats'         => ['passed' => $passed, 'flaky' => $flaky, 'failed' => $failed]

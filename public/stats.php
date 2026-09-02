@@ -3,7 +3,7 @@
 <head>
 <title>Autotests - Stats</title>
 <meta charset="utf-8">
-<!-- 1. Script inline : pose data-theme IMMÉDIATEMENT (anti-flash même en hard refresh) -->
+<!-- 1. Inline script: sets data-theme IMMEDIATELY (anti-flash even on hard refresh) -->
 <script>
 	(function() {
 		try {
@@ -14,9 +14,9 @@
 	})();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Theme init (avant CSS pour éviter le flash) -->
+<!-- Theme init (before CSS to avoid the flash) -->
 <script src="js/theme.js"></script>
-<!-- Bootstrap 3 (conservé pour compatibilité avec la mise en page existante) -->
+<!-- Bootstrap 3 (kept for compatibility with the existing layout) -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
 <link href="css/theme.css" rel="stylesheet">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
@@ -31,13 +31,13 @@
 <?php
 /**
  * STATS.PHP
- * Affiche l'historique des runs (statistiques) d'un TestSet/Job
- * Version adaptée pour LOGG (PDO via config.php)
+ * Displays the run history (statistics) of a TestSet/Job
+ * Version adapted for LOGG (PDO via config.php)
  */
 
 require_once '../config/config.php';
 
-// Récupérer et nettoyer les paramètres GET
+// Get and clean the GET parameters
 $JJob         = $_GET['JJob'] ?? '';
 $LogVersion   = $_GET['LogVersion'] ?? '';
 $LimitPlus    = isset($_GET['LimitPlus']) ? max(1, intval($_GET['LimitPlus'])) : 5;
@@ -48,15 +48,15 @@ $Versiontype  = $_GET['Versiontype'] ?? 'RC';
 $Testtype     = $_GET['Testtype'] ?? '';
 $TestBrowser  = $_GET['TestBrowser'] ?? 'chrome';
 
-// Calculer la version "courte" (ex: x17 depuis x17_dev), sauf pour SmartWe (we_*)
+// Calculate the "short" version (e.g. x17 from x17_dev), except for SmartWe (we_*)
 if (substr($LogVersion, 0, 2) !== "we") {
     $LogVersionTrimmed = substr($LogVersion, 0, 3);
 } else {
     $LogVersionTrimmed = $LogVersion;
 }
 
-// SmartWe : la colonne Testtype en base contient le nom de table (we_rc, we_hf, we_dev)
-// Convertir rc_x17 -> we_rc, hf_x17 -> we_hf, dev_x18 -> we_dev
+// SmartWe: the Testtype column in the DB holds the table name (we_rc, we_hf, we_dev)
+// Convert rc_x17 -> we_rc, hf_x17 -> we_hf, dev_x18 -> we_dev
 $isSmartWe = ($ProductFilter === 'weWebSel' || strpos($ProductFilter, 'smartWe') !== false || 
               strpos($ProductFilter, 'SmartWe') !== false || substr($LogVersion, 0, 2) === 'we');
 if ($isSmartWe) {
@@ -69,7 +69,7 @@ if ($isSmartWe) {
     }
 }
 
-// gWClient : déterminer la table selon le Testtype
+// gWClient: determine the table based on the Testtype
 if ($ProductFilter === 'gWClient') {
     $gwClientMap = [
         'hf_x14'  => 'x14_gwhf',
@@ -91,14 +91,14 @@ if ($ProductFilter === 'gWClient') {
     }
 }
 
-// Valider le nom de table (sécurité)
+// Validate the table name (security)
 if (!preg_match('/^[a-z0-9_]+$/i', $LogVersion)) {
     echo "<div class='container-fluid'><center>Invalid table name</center></div></body></html>";
     exit;
 }
 
 try {
-    // Lister les jobs distincts
+    // List the distinct jobs
     $selectJobs = "SELECT DISTINCT JJob FROM `$LogVersion`
                    WHERE JJob = :jjob AND Version = :version AND TestLogTyp = 'Main' AND JJob != ''
                    ORDER BY JJob ASC";
@@ -124,7 +124,7 @@ try {
     $LineJob = 0;
     $Lines = 0;
 
-    // Lien retour vers index.php (local logg/public)
+    // Back link to index.php (local logg/public)
     $backLink = "index.php?Product=" . urlencode($ProductFilter) .
                 "&Testtype=" . urlencode($Testtype) .
                 "&Filter=" . urlencode($FilterResults);
@@ -134,7 +134,7 @@ try {
         foreach ($jobsList as $jobsListrow) {
             $LineJob++;
 
-            // Rechercher tous les TCProj pour ce JJob
+            // Find all the TCProj for this JJob
             if ($TestProject !== "") {
                 $testSql = "SELECT DISTINCT JParam FROM `$LogVersion`
                             WHERE Version = :version AND TestLogTyp = 'Main'
@@ -171,7 +171,7 @@ try {
                     $Lines++;
                     $Lines = $LineJob + $Lines;
 
-                    // Récupérer les derniers runs
+                    // Get the latest runs
                     $selectAllRuns = "SELECT * FROM `$LogVersion`
                                       WHERE JJob = :jjob AND TestLogTyp = 'Main'
                                       AND Testtype = :testtype AND JParam = :jparam
@@ -182,7 +182,7 @@ try {
                     $stmtRuns->bindValue(':jparam', $rowProject['JParam']);
                     $stmtRuns->bindValue(':limitplus', $LimitPlus, PDO::PARAM_INT);
 
-                    // ===== DEBUG : afficher la requête SQL avec les valeurs =====
+                    // ===== DEBUG: display the SQL query with the values =====
                     /*$debugSql = $selectAllRuns;
                     $debugSql = str_replace(':jjob', "'" . $jobsListrow['JJob'] . "'", $debugSql);
                     $debugSql = str_replace(':testtype', "'" . $Testtype . "'", $debugSql);
@@ -190,7 +190,7 @@ try {
                     $debugSql = str_replace(':limitplus', $LimitPlus, $debugSql);
                     echo "<pre style='background:#f5f5f5;color:#333;border:1px solid #ccc;padding:8px;font-size:12px;white-space:pre-wrap;'>"
                          . "🐞 DEBUG SQL stmtRuns:\n" . htmlspecialchars($debugSql) . "</pre>";
-                    // ===== FIN DEBUG =====
+                    // ===== END DEBUG =====
 					*/
 
                     $stmtRuns->execute();
@@ -253,7 +253,7 @@ try {
 
                                         echo "<td style=\"text-align:center\">" . htmlspecialchars(trim($row['Build'])) . "</td>";
 
-                                        // Lien suppression du log
+                                        // Log deletion link
                                         $deleteLink = "delete.php?AutoID=" . urlencode($row['AutoID']) .
                                                       "&Version=" . urlencode($LogVersion) .
                                                       "&TestProject=" . urlencode($row['JParam']) .
@@ -267,7 +267,7 @@ try {
                                         echo "<td style=\"text-align:center\">" . htmlspecialchars($row['RunDate']) . "</td>";
                                         echo "<td style=\"text-align:center\">" . htmlspecialchars($row['RunDuration']) . "</td>";
 
-                                        // Transformer le LogLink (port + pipeline)
+                                        // Transform the LogLink (port + pipeline)
                                         $old = array("http:", "8080");
                                         $new = array("https:", "8181");
                                         $LogLink = str_replace($old, $new, $row['LogLink']);
@@ -293,7 +293,7 @@ try {
                                     </tbody>
                                 </table>
                                 <?php
-                                // Lien "More..." (augmente la limite)
+                                // "More..." link (increases the limit)
                                 $moreLink = "stats.php?Product=" . urlencode($ProductFilter) .
                                             "&JJob=" . urlencode($JJob) .
                                             "&Filter=" . urlencode($FilterResults) .

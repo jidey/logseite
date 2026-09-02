@@ -13,10 +13,10 @@ try {
     $product  = $_POST['Product'] ?? '';
 
     if (!$autoID || !$testType) {
-        throw new Exception('Paramètres manquants: AutoID=' . $autoID . ', TestType=' . $testType);
+        throw new Exception('Missing parameters: AutoID=' . $autoID . ', TestType=' . $testType);
     }
     if (!isset($pdo)) {
-        throw new Exception('Connexion PDO non disponible');
+        throw new Exception('PDO connection not available');
     }
 
     // Build the table name from testType + product
@@ -25,7 +25,7 @@ try {
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
-    // Mapping centralisé dans config/versions_config.php (chargé via config.php)
+    // Centralized mapping in config/versions_config.php (loaded via config.php)
     if ($isSmartWe) {
         // SmartWe: we_* table depending on the branch, regardless of the x version
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';
@@ -37,7 +37,7 @@ try {
         // gW Web: rc_x17 -> x17_rc
         $tableName = $product_table_map[$testType]['gWWebSel'] ?? null;
         if (!$tableName) {
-            // Repli si le testType n'est pas (encore) dans le mapping central
+            // Fallback if the testType is not (yet) in the central mapping
             preg_match('/x\d+/', $testType, $versionMatch);
             $version = $versionMatch[0] ?? 'x17';
             $branch  = explode('_', $testType)[0] ?? 'rc';
@@ -47,7 +47,7 @@ try {
 
     // Table name validation (security)
     if (!$tableName || !preg_match('/^[a-z0-9_]+$/i', $tableName)) {
-        throw new Exception('Impossible de résoudre la table pour Product=' . $product . ' TestType=' . $testType);
+        throw new Exception('Unable to resolve the table for Product=' . $product . ' TestType=' . $testType);
     }
 
     // Update the validation in the database
@@ -62,12 +62,12 @@ try {
     ]);
 
     if (!$result) {
-        throw new Exception('Erreur lors de la mise à jour: ' . implode(', ', $stmt->errorInfo()));
+        throw new Exception('Error while updating: ' . implode(', ', $stmt->errorInfo()));
     }
 
     echo json_encode([
         'success'       => true,
-        'message'       => 'Validation mise à jour avec succès',
+        'message'       => 'Validation updated successfully',
         'rows_affected' => $stmt->rowCount(),
         'table'         => $tableName
     ]);

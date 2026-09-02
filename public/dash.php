@@ -18,7 +18,7 @@
 		  max-width:100%;
 		  table-layout:fixed;   /* columns share the width evenly */
 		}
-		
+
 		.tg td{
 		  border-color:black;border-style:solid;border-width:2px;
 		  font-family:Arial, sans-serif;
@@ -36,17 +36,17 @@
 		  padding:clamp(4px, 0.6vw, 14px) clamp(2px, 0.5vw, 18px);
 		  word-break:break-word;
 		}
-		
+
 		/* First column (Branch / Passed / Failed labels) stays narrow */
 		.tg td:first-child, .tg th:first-child { width:90px; }
-		
+
 		/* Images in the header scale down too */
 		.tg th img { max-width:100%; height:auto; }
-		
+
 		.tg .testfail{background-color:#FFCCC9;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
 		.tg .testwarn{background-color:#FFE787;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
 		.tg .testok{background-color:#4CFF00;border-color:#000000;color:#ffffff;font-weight:bold;text-align:center;vertical-align:top}
-		
+
 		.tg .tg-simple1{border-color:black;color:#808080;text-align:center;vertical-align:center}
 		.tg .tg-simple{border-color:black;font-weight:bold;text-align:center;vertical-align:center}
 
@@ -62,7 +62,7 @@
 			display:block;
 			text-decoration:none;
 		}
-		
+
 		/* Version color coding (Branch row) */
 		.tg .tg-we   { background-color:#e8f4fd; border-left:3px solid #1e88e5; }
 		.tg .tg-x16  { background-color:#f3e5f5; border-left:3px solid #8e24aa; }
@@ -74,16 +74,16 @@
 <tbody>
 	<?php
 	require_once __DIR__ . '/../config/config.php';
-	
+
 	if (isset($_GET['refresh']))
 	{$refresh = $_GET['refresh'];}
 	else{$refresh = "false";}
-	
+
 	function isItTimeToGetLastRuns() {
 		global $pdo;
-		// Protégé : si `we_dev_daily` n'existe pas/plus (table renommée ou pas
-		// encore créée), on force un refresh au lieu de faire planter toute la
-		// page (voir aussi readLastRunResults/getLastResults ci-dessous).
+		// Protected: if `we_dev_daily` no longer exists (table renamed or not
+		// created yet), force a refresh instead of crashing the whole page
+		// (see also readLastRunResults/getLastResults below).
 		try {
 			$sql="SELECT timestamp FROM `we_dev_daily` ORDER BY `index` DESC LIMIT 1";
 			$results = $pdo->query($sql);
@@ -94,7 +94,7 @@
 			}
 
 			if (empty($timestamp)) {
-				return true; // pas encore de donnée -> tenter un refresh
+				return true; // no data yet -> try a refresh
 			}
 
 			// Current date and time
@@ -118,13 +118,13 @@
 			}
 		} catch (PDOException $e) {
 			error_log("isItTimeToGetLastRuns error: " . $e->getMessage());
-			return false; // évite de retenter à chaque chargement si la table est cassée
+			return false; // avoids retrying on every load if the table is broken
 		}
 	}
 
-	function getBranchVersionWe($tag) { //Problem with file_get_contents(): SSL: 
-		$url = "https://dcs-versiontool.internalk8s.home.cas.de/smartwe-versions/versions/search/findByTag?tag=$tag";			
-		
+	function getBranchVersionWe($tag) { //Problem with file_get_contents(): SSL:
+		$url = "https://dcs-versiontool.internalk8s.home.cas.de/smartwe-versions/versions/search/findByTag?tag=$tag";
+
 		$context = stream_context_create([
 			'ssl' => [
 				'verify_peer' => true,
@@ -149,15 +149,15 @@
 				error_log("Unexpected JSON structure for tag: $tag");
 				return null;
 			}
-			
+
 			$versionData = $data['_embedded']['versions'][0];
 			$version = $versionData['smartDesignVersion'] ?? '';
 			$sdversion = explode("-", $version);
 			$branch = $versionData['branch'] ?? '';
 			$commitId = $versionData['commitId'] ?? '';
 			$wecommit = substr($commitId, 0, 6); // start from position 6
-			
-			return [$branch, $sdversion[0] ?? '', $wecommit];		
+
+			return [$branch, $sdversion[0] ?? '', $wecommit];
 		} else {
 			error_log("Invalid JSON data for tag: $tag");
 			return null;
@@ -172,14 +172,14 @@
 			// Read the content of the file
 			return file_get_contents($filePath);
 		} else {
-			// Fichier de déploiement pas encore créé pour cette branche (ex:
-			// version toute juste ajoutée dans versions_config.php, nightly
-			// pas encore configuré) : on n'affiche plus l'erreur brute dans
-			// la page, juste une valeur vide.
+			// Deployment file not created yet for this branch (e.g. a
+			// version just added in versions_config.php, nightly not
+			// configured yet): no longer echoes the raw error into the
+			// page, just an empty value.
 			return '';
 		}
 	}
-	
+
 	function getColorClass($failed) {
 		if ($failed == 0) {
 			return "tg-green";
@@ -195,11 +195,11 @@
 		$urlWithFilter = $url . $separator . 'ErrorOnly=1';
 		echo "<td class=".$color."><a href=\"".$urlWithFilter."\" style=\"display:block;\">".$failed."</a></td>";
 	}
-	
+
 	function readLastRunResults($table) {
 		global $pdo;
-		// Protégé : une table "..._daily" manquante (version retirée/pas encore
-		// créée) affiche des cases vides au lieu de faire planter toute la page.
+		// Protected: a missing "..._daily" table (retired/not yet created
+		// version) shows empty cells instead of crashing the whole page.
 		try {
 			$sql="SELECT * FROM `".$table."_daily` ORDER BY `index` DESC LIMIT 1";
 			$results = $pdo->query($sql);
@@ -220,9 +220,9 @@
 
 	function getLastResults($table, $testType, $product, $job, $Branch) {
 		global $pdo;
-		// Protégé : une table de version retirée/pas encore créée renvoie null
-		// (comme le cas "aucun résultat" déjà géré ci-dessous) au lieu de faire
-		// planter toute la page.
+		// Protected: a retired/not yet created version's table returns null
+		// (like the "no results" case already handled below) instead of
+		// crashing the whole page.
 		try {
 			$query = "SELECT l1.* FROM `$table` as l1
 					  LEFT JOIN `$table` as l2 ON (l1.JParam = l2.JParam AND l1.jjob = l2.jjob
@@ -267,23 +267,23 @@
 		}
 		return null;
 	}
-	
+
 	//Get Build Version Number
-	$WeDevVersion = getBranchVersion("Wewedev");		
+	$WeDevVersion = getBranchVersion("Wewedev");
 	$WeRCVersion = getBranchVersion("Wewerc");
 	$WeHFVersion = getBranchVersion("Wewehf");
-	
-	[$WeDevVersion, $sdweDEV, $commitIdDEV] = getBranchVersionWe("dev") ?? ['', '', ''];						
+
+	[$WeDevVersion, $sdweDEV, $commitIdDEV] = getBranchVersionWe("dev") ?? ['', '', ''];
 	[$WeRCVersion, $sdweRC, $commitIdRC] = getBranchVersionWe("rc") ?? ['', '', ''];
 	[$WeHFVersion, $sdweHF, $commitIdHF] = getBranchVersionWe("hotfix") ?? ['', '', ''];
-	
-	
+
+
 	// --------------------------------------------------------------------
-	// gW Web (colonnes "sd.png") : construit dynamiquement à partir de
-	// config/versions_config.php. Ordre par colonne : HF, RC, DEV, groupé
-	// par version croissante (x16, x17, x18, x19...) — identique à l'ordre
-	// historique. Ajouter une version dans $LOGG_VERSIONS (versions_config.php)
-	// suffit : elle apparaît ici automatiquement, sans toucher à dash.php.
+	// gW Web (the "sd.png" columns): built dynamically from
+	// config/versions_config.php. Column order: HF, RC, DEV, grouped by
+	// increasing version (x16, x17, x18, x19...) — same as the historical
+	// order. Adding a version to $LOGG_VERSIONS (versions_config.php) is
+	// enough: it shows up here automatically, no need to touch dash.php.
 	// --------------------------------------------------------------------
 	$webBranchOrder = ['hf', 'rc', 'dev'];
 	$webByVersion = [];
@@ -292,9 +292,9 @@
 		$webByVersion[$vmParts['version']][$vmParts['branch']] = $vmTestType;
 	}
 
-	// Classes CSS existantes (voir <style> en haut du fichier) pour x16/x17/x18 ;
-	// palette de repli générée automatiquement pour x19 et les versions suivantes
-	// (pas de classe CSS dédiée à créer à chaque nouvelle version).
+	// Existing CSS classes (see <style> at the top of the file) for x16/x17/x18;
+	// fallback palette automatically generated for x19 and later versions
+	// (no dedicated CSS class needs to be created for every new version).
 	$webVersionCssClass = ['x16' => 'tg-x16', 'x17' => 'tg-x17', 'x18' => 'tg-x18'];
 	$webFallbackPalette = [
 		['bg' => '#e0f7fa', 'border' => '#00838f'],
@@ -311,7 +311,7 @@
 		}
 		foreach ($webBranchOrder as $webBranch) {
 			if (!isset($webBranchesForVersion[$webBranch])) {
-				continue; // branche retirée / pas encore active pour cette version (ex: dev_x16, rc_x16)
+				continue; // branch retired / not yet active for this version (e.g. dev_x16, rc_x16)
 			}
 			$webTestType = $webBranchesForVersion[$webBranch];
 			$webTable = $product_table_map[$webTestType]['gWWebSel'] ?? null;
@@ -320,8 +320,8 @@
 			}
 			$webPartsFull = logg_branch_vm_parts($webTestType);
 
-			// Même convention de tag que l'ancien code en dur : "Sel" + branche + numéro
-			// (ex: "Selhf17" -> deployedVM/lastSelhf17Deploy.txt)
+			// Same tag convention as the old hardcoded code: "Sel" + branch + number
+			// (e.g. "Selhf17" -> deployedVM/lastSelhf17Deploy.txt)
 			$webRawVersion = getBranchVersion('Sel' . $webBranch . $webPartsFull['num']);
 			$webPrefix = $LOGG_VERSION_LABEL_PREFIX[$webVersion] ?? null;
 			$webLabel = $webPrefix ? str_replace($webPrefix, $webVersion . '.', $webRawVersion) : $webRawVersion;
@@ -339,20 +339,20 @@
 		}
 	}
 	$webResults = [];
-	
-	if(isItTimeToGetLastRuns() || $refresh == "true"){	
+
+	if(isItTimeToGetLastRuns() || $refresh == "true"){
 		[$we_dev_passed,$we_dev_failed] = getLastResults("we_dev","we_dev","We","Grid",$WeDevVersion);
 		[$we_rc_passed,$we_rc_failed] = getLastResults("we_rc","we_rc","We","Grid",$WeRCVersion);
 		[$we_hf_passed,$we_hf_failed] = getLastResults("we_hf","we_hf","We","Grid",$WeHFVersion);
 
-		// gW Web : idem, piloté par $webBranches (voir plus haut). Le retour est
-		// écrasé juste en dessous par readLastRunResults() qui relit le cache
-		// "_daily" fraîchement mis à jour par le side-effect de getLastResults()
-		// (POST vers dailyStats.php) — comportement identique à l'ancien code.
+		// gW Web: same idea, driven by $webBranches (see above). The return
+		// value is overwritten right below by readLastRunResults(), which
+		// re-reads the "_daily" cache freshly updated by getLastResults()'s
+		// side effect (POST to dailyStats.php) — same behavior as the old code.
 		foreach ($webBranches as $wb) {
 			$webResults[$wb['testType']] = getLastResults($wb['table'], $wb['testType'], "Web", "Grid", $wb['label']);
 		}
-		
+
 		// No refresh needed, the database is used directly
 		// $streamContext = stream_context_create([
 		// 	'ssl' => [
@@ -361,11 +361,11 @@
 		// 	'method'  => 'POST'
 		// 	]
 		// ]);
-		// 
+		//
 		// $url="https://sqs-sel-cent1.cas-software.dev/logg/public/dash.php";
 		// $content = file_get_contents($url,false, $streamContext);
 		// //header("Location: " . $url);
-	}	
+	}
 	?>
 	<!-- Theme Toggle Button -->
 	<button id="themeToggle" class="btn btn-sm btn-outline-secondary theme-toggle-btn" title="Toggle Dark/Light Mode" onclick="toggleTheme()">
@@ -373,12 +373,12 @@
 	</button>
 	<center>
 	<br><a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php"><< UI-TESTS STATUS Summary</a><br><br>
-	</center>	
+	</center>
     <table class="tg">
 		<thead>
 		  <tr >
-			<?php	
-			echo "<th class=\"tg-simple1\"><a href=\"https://sqs-sel-cent1.cas-software.dev/logg/public/dash.php?refresh=true\" style=\"display:block;\"><img title=\"Refresh results\" src=\"icons\\refresh.png\"><br>Reload</a></th>";  
+			<?php
+			echo "<th class=\"tg-simple1\"><a href=\"https://sqs-sel-cent1.cas-software.dev/logg/public/dash.php?refresh=true\" style=\"display:block;\"><img title=\"Refresh results\" src=\"icons\\refresh.png\"><br>Reload</a></th>";
 			echo "<th class=\"tg-simple\" colspan=\"3\"><img src=\"icons\\we.png\"></th>";
 			echo "<th class=\"tg-simple\" colspan=\"" . count($webBranches) . "\"><img src=\"icons\\sd.png\"></th>";
 			//echo "<th class=\"tg-simple\" colspan=\"4\"><img src=\"icons\\gW.png\"></th>";
@@ -386,16 +386,16 @@
 		  </tr>
 		</thead>
 		<tbody>
-			<?php			
+			<?php
 			// Get Values from last backup (Quick)
 			[$we_dev_passed,$we_dev_failed] = readLastRunResults("we_dev");
 			[$we_rc_passed,$we_rc_failed] = readLastRunResults("we_rc");
 			[$we_hf_passed,$we_hf_failed] = readLastRunResults("we_hf");
-			
+
 			foreach ($webBranches as $wb) {
 				$webResults[$wb['testType']] = readLastRunResults($wb['table']);
 			}
-			
+
 			//Write results in table
 			for ($row = 1; $row <= 3; $row++) {
 				echo '<tr>';
@@ -404,7 +404,7 @@
 						echo "<td class=\"tg-simple1 tg-we\">$WeHFVersion (hf) $sdweHF <font size=\"1\">(#$commitIdHF)</font></td>";
 						echo "<td class=\"tg-simple1 tg-we\">$WeRCVersion (rc) $sdweRC <font size=\"1\">(#$commitIdRC)</font></td>";
 						echo "<td class=\"tg-simple1 tg-we\">$WeDevVersion (dev) $sdweDEV <font size=\"1\">(#$commitIdDEV)</font></td>";
-						
+
 						foreach ($webBranches as $wb) {
 							$classAttr = $wb['class'] !== '' ? 'tg-simple1 ' . $wb['class'] : 'tg-simple1';
 							$styleAttr = $wb['style'] !== '' ? ' style="' . $wb['style'] . '"' : '';
@@ -435,12 +435,12 @@
 							generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=" . urlencode($wb['testType']) . "&TestBrowser=chrome", $failed);
 						}
 					}
-				echo '</tr>';				
+				echo '</tr>';
 			}
 			?>
 		</tbody>
     </table>
-    
+
     <!-- Include Bootstrap JS and its dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>

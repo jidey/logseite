@@ -6,10 +6,10 @@
  *
  * GET parameters:
  * - value: value to write
- * - field: 'running' pour forcer la MAJ de running (sinon value<2 → checked, value>=2 → running)
+ * - field: 'running' to force updating running (otherwise value<2 → checked, value>=2 → running)
  * - autoid: AutoID of the scenario/testset
  * - Testtype + Product: used to resolve the table (handles SmartWe -> we_rc)
- * - LogVersion: nom de table direct (fallback)
+ * - LogVersion: direct table name (fallback)
  */
 
 // Suppress any error output that would corrupt the JSON
@@ -33,7 +33,7 @@ try {
     respond(false, 'Config error: ' . $e->getMessage());
 }
 
-// Recuperer les parametres
+// Get the parameters
 $value      = isset($_GET['value'])      ? intval($_GET['value'])   : 0;
 $autoid     = isset($_GET['autoid'])     ? $_GET['autoid']          : "";
 $JJob       = isset($_GET['JJob'])       ? $_GET['JJob']            : "";
@@ -43,11 +43,11 @@ $LogVersion = isset($_GET['LogVersion']) ? $_GET['LogVersion']      : "";
 $Product    = isset($_GET['Product'])    ? $_GET['Product']         : "";
 $field      = isset($_GET['field'])      ? $_GET['field']           : "";
 
-// Mapping des tables (Testtype + Product -> table)
-// Centralisé dans config/versions_config.php ($product_table_map, chargé via config.php)
+// Table mapping (Testtype + Product -> table)
+// Centralized in config/versions_config.php ($product_table_map, loaded via config.php)
 $tableMap = $product_table_map ?? [];
 
-// Determiner le nom de la table
+// Determine the table name
 $tableName = "";
 if (!empty($Testtype) && !empty($Product) && isset($tableMap[$Testtype][$Product])) {
     $tableName = $tableMap[$Testtype][$Product];
@@ -55,12 +55,12 @@ if (!empty($Testtype) && !empty($Product) && isset($tableMap[$Testtype][$Product
     $tableName = $LogVersion;
 }
 
-// Validate the table name (securite)
+// Validate the table name (security)
 if (empty($tableName) || !preg_match('/^[a-z0-9_]+$/i', $tableName)) {
     respond(false, 'Invalid or missing table name', ['testtype' => $Testtype, 'product' => $Product]);
 }
 
-// Construire la requete UPDATE
+// Build the UPDATE query
 $sqlcheck = "";
 $params = [];
 
@@ -76,7 +76,7 @@ if ($autoid !== "") {
     respond(false, 'Missing autoid');
 }
 
-// Executer
+// Execute
 try {
     $stmt = $pdo->prepare($sqlcheck);
     $stmt->execute($params);

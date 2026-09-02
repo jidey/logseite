@@ -8,29 +8,29 @@
 		respond(false, 'Config error: ' . $e->getMessage());
 	}
 
-	if (isset($_GET['LogVersion'])) 
+	if (isset($_GET['LogVersion']))
 	{$LogVersion = $_GET['LogVersion'];}
 	else{$LogVersion = "";}
-	
-	if (isset($_GET['TestProject'])) 
+
+	if (isset($_GET['TestProject']))
 	{$TCProj = $_GET['TestProject'];}
 	else{$TCProj = "";}
-	
-	if (isset($_GET['TestProject'])) 
+
+	if (isset($_GET['TestProject']))
 	{$TCProj = $_GET['TestProject'];}
 	else{$TCProj = "";}
-	
+
 	if (isset($_GET['Build']))
 	{$Build = urldecode($_GET['Build']);}
 	else{$Build = "";}
-	
-	if (isset($_GET['Duration'])) 
+
+	if (isset($_GET['Duration']))
 	{$Duration = $_GET['Duration'];}
 	else{$Duration = "";}
-	
+
 	$sqlupdate ="UPDATE `".$LogVersion."` SET `RunDuration`='".$Duration."' WHERE TCProj='".$TCProj."' AND Build='".$Build."' AND JParam='".$TCProj."'";
-	
-	// Executer
+
+	// Execute
 	try {
 		$stmt->execute($sqlupdate);
 		respond(true, 'Updated successfully', [

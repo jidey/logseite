@@ -87,6 +87,7 @@ $browser = $_GET['TestBrowser'] ?? 'chrome';
 $testsetFilter = $_GET['TestsetFilter'] ?? '';  // Filter by TestSet name
 $teamTag = $_GET['TeamTag'] ?? '';  // Filter by Team tag
 $errorOnly = isset($_GET['ErrorOnly']) && $_GET['ErrorOnly'] === '1';  // Show only errors
+$dbServer = $_GET['DBServer'] ?? '';  // Filter by DB server (SQL | PGS | '' = all)
 
 // Normalize the testType for SmartWe BEFORE any DB query
 // SmartWe: rc -> rc_x18, hf -> hf_x18 ,dev -> dev_x18
@@ -97,9 +98,9 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = $LOGG_SMARTWE_HF;  // ex: hf_x18 (voir config/versions_config.php)
+        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = $LOGG_SMARTWE_RC;  // ex: rc_x18 (voir config/versions_config.php)
+        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see config/versions_config.php)
     }
 }
 
@@ -169,7 +170,7 @@ try {
         }
         
         // Apply filters
-        $testsets = array_filter($testsets, function($testset) use ($testsetFilter, $teamTag, $errorOnly) {
+        $testsets = array_filter($testsets, function($testset) use ($testsetFilter, $teamTag, $errorOnly, $dbServer) { 	
             // Filter by TestSet name
             if (!empty($testsetFilter)) {
                 $jparam = $testset['JParam'] ?? '';
@@ -206,6 +207,15 @@ try {
                 }
             }
             
+            // Filter by DB server
+            if (!empty($dbServer)) {
+                $currentDb = trim($testset['DBServer'] ?? '');
+                if ($currentDb === '') $currentDb = 'SQL';  // Default
+                if ($currentDb !== $dbServer) {
+                    return false;
+                }
+            }
+			
             return true;
         });
         
@@ -277,14 +287,14 @@ $testTypesForProduct = $repo->getAvailableTestTypesForProduct($product);
 $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
 // For gW Desktop, force the specific branch list
-// (liste centralisée dans config/versions_config.php : $LOGG_GW_DESKTOP_LIST)
+// (centralized list in config/versions_config.php: $LOGG_GW_DESKTOP_LIST)
 if ($isGwDesktop) {
     // Display all these branches, whether they have data or not
     $testTypesForProduct = $LOGG_GW_DESKTOP_LIST;
 } else {
     // For the other products (gW Web, etc.), obsolete branches are already
-    // excluded upstream: TestLogRepository ne renvoie que les branches dont
-    // le statut n'est pas 'retired' dans config/versions_config.php.
+    // excluded upstream: TestLogRepository only returns branches whose
+    // status is not 'retired' in config/versions_config.php.
 
     // Add the feature branch (gW Web) if missing
     if (!$isSmartWe && !in_array('web_feat', $testTypesForProduct)) {
@@ -362,7 +372,7 @@ if (empty($testTypesForProduct)) {
             const urlParams = new URLSearchParams(window.location.search);
             
             const hasAnyFilter = urlParams.has('Product') || urlParams.has('Testtype') || 
-                                 urlParams.has('TeamTag') || urlParams.has('ErrorOnly');
+                                 urlParams.has('TeamTag') || urlParams.has('DBServer') || urlParams.has('ErrorOnly');
             
             if (!hasAnyFilter) {
                 let prefs = {};
@@ -385,6 +395,12 @@ if (empty($testTypesForProduct)) {
                     urlParams.set('TeamTag', prefs.team_tag);
                     needsRedirect = true;
                 }
+				
+				if (prefs.db_server) {
+                    urlParams.set('DBServer', prefs.db_server);
+                    needsRedirect = true;
+                }
+				
                 if (prefs.error_only === 1 || prefs.error_only === '1') {
                     urlParams.set('ErrorOnly', '1');
                     needsRedirect = true;
@@ -496,8 +512,8 @@ if (empty($testTypesForProduct)) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php
-                                // Branches marquées 'future' dans config/versions_config.php
-                                // -> affichées entre parenthèses (pas encore disponibles)
+                                // Branches marked 'future' in config/versions_config.php
+                                // -> displayed in parentheses (not yet available)
                                 $notYetAvailable = $LOGG_FUTURE_TESTTYPES;
                                 foreach ($testTypesForProduct as $v):
                                     $displayLabel = in_array($v, $notYetAvailable) ? "($v)" : $v;
@@ -514,6 +530,16 @@ if (empty($testTypesForProduct)) {
                     <!-- Browser (hidden - always chrome by default) -->
                     <input type="hidden" name="TestBrowser" value="chrome">
 
+					<!-- DB Server Filter -->
+                    <div>
+                        <label for="dbserver" class="form-label"><strong>DB Server</strong></label>
+                        <select class="form-select" id="dbserver" name="DBServer" style="width: 100%;">
+                            <option value="" <?php echo $dbServer === '' ? 'selected' : ''; ?>>All</option>
+                            <option value="SQL" <?php echo $dbServer === 'SQL' ? 'selected' : ''; ?>>SQL</option>
+                            <option value="PGS" <?php echo $dbServer === 'PGS' ? 'selected' : ''; ?>>PGS</option>
+                        </select>
+                    </div>
+					
                     <!-- Team Filter -->
                     <div>
                         <label for="teamtag" class="form-label"><strong>Team</strong></label>
@@ -947,7 +973,7 @@ if (empty($testTypesForProduct)) {
             });
 
             // CENTRALIZED FILTER HANDLING
-            ['product', 'testtype', 'teamtag'].forEach(function(id) {
+            ['product', 'testtype', 'teamtag', 'dbserver'].forEach(function(id) {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('change', function() {
@@ -1002,6 +1028,7 @@ if (empty($testTypesForProduct)) {
         // Save preferences to local cache
         function savePreferences() {
 			const browserEl = document.getElementById('browser');
+			const dbserverEl = document.getElementById('dbserver');
 			const prefs = {
 				theme: document.body.classList.contains('dark-mode') ? 'dark' : 'light',
 				text_size: parseInt(textSizeSlider.value),
@@ -1009,7 +1036,8 @@ if (empty($testTypesForProduct)) {
 				product: document.getElementById('product').value,
 				testtype: document.getElementById('testtype').value,
 				test_browser: browserEl ? browserEl.value : 'chrome',
-				team_tag: document.getElementById('teamtag').value
+				team_tag: document.getElementById('teamtag').value,
+				db_server: dbserverEl ? dbserverEl.value : ''
 			};
 			
 			localStorage.setItem('logg-prefs', JSON.stringify(prefs));
@@ -1091,6 +1119,7 @@ if (empty($testTypesForProduct)) {
             // Apply theme - read logg-theme (key shared across all pages)
             const theme = localStorage.getItem('logg-theme') || prefs.theme || 'light';
 			
+			
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.body.classList.remove('light-mode');
@@ -1112,7 +1141,8 @@ if (empty($testTypesForProduct)) {
             const teamtagSelect = document.getElementById('teamtag');
             const errorsOnBtn = document.getElementById('errorsOnBtn');
             const errorsOffBtn = document.getElementById('errorsOffBtn');
-            
+            const dbserverSelect = document.getElementById('dbserver');
+			
             if (!urlParams.has('Product') && productSelect && prefs.product) {
                 productSelect.value = prefs.product;
             }
@@ -1126,6 +1156,10 @@ if (empty($testTypesForProduct)) {
                 teamtagSelect.value = prefs.team_tag;
             }
             
+            if (!urlParams.has('DBServer') && dbserverSelect && prefs.db_server) {
+                dbserverSelect.value = prefs.db_server;
+            }
+			
             if (!urlParams.has('ErrorOnly')) {
                 if (prefs.error_only === 1 && errorsOnBtn) {
                     errorsOnBtn.checked = true;

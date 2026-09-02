@@ -1,21 +1,21 @@
 <?php
 /**
  * CLEAR_CACHE.PHP
- * Script pour vider le cache LOGG
- * 
- * Utilisation :
- * - Placer ce fichier dans public/
- * - Accéder à http://localhost/logg/public/clear_cache.php
- * - Ou exécuter en CLI : php public/clear_cache.php
+ * Script to clear the LOGG cache
+ *
+ * Usage:
+ * - Place this file in public/
+ * - Access http://localhost/logg/public/clear_cache.php
+ * - Or run via CLI: php public/clear_cache.php
  */
 
-// Déterminer le dossier cache
+// Determine the cache folder
 $cacheDir = sys_get_temp_dir() . '/logg_cache';
 
-echo "🧹 Nettoyage du cache LOGG...\n\n";
+echo "🧹 Clearing the LOGG cache...\n\n";
 
 if (!is_dir($cacheDir)) {
-    echo "ℹ️ Cache non trouvé (normal si jamais utilisé).\n";
+    echo "ℹ️ Cache not found (normal if it was never used).\n";
     exit(0);
 }
 
@@ -23,18 +23,19 @@ $files = glob($cacheDir . '/*');
 $count = 0;
 
 if (empty($files)) {
-    echo "ℹ️ Dossier cache vide.\n";
+    echo "ℹ️ Cache folder is empty.\n";
 } else {
     foreach ($files as $file) {
         if (is_file($file)) {
             if (unlink($file)) {
-                echo "✅ Supprimé: " . basename($file) . "\n";
+                echo "✅ Deleted: " . basename($file) . "\n";
                 $count++;
             }
         }
     }
-    echo "\n✅ Cache vidé! ($count fichiers supprimés)\n";
+    echo "\n✅ Cache cleared! ($count files deleted)\n";
 }
 
-echo "\nℹ️ Le cache sera régénéré au prochain accès.\n";
+echo "\nℹ️ The cache will be regenerated on the next access.\n";
 ?>
+

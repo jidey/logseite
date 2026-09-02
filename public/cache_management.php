@@ -1,7 +1,7 @@
 <?php
 /**
  * CACHE MANAGEMENT PAGE
- * Interface pour gérer et monitorer le cache du système
+ * Interface to manage and monitor the system cache
  * URL: http://localhost/log/public/cache_management.php
  */
 
@@ -27,7 +27,7 @@ if (isset($_GET['action'])) {
     }
 }
 
-// Récupérer les stats après action
+// Get stats after the action
 $cacheStats = $repo->getCacheStats();
 ?>
 <!DOCTYPE html>
@@ -36,16 +36,16 @@ $cacheStats = $repo->getCacheStats();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cache Management</title>
-    <!-- Theme init (avant CSS pour éviter le flash) -->
+    <!-- Theme init (before CSS to avoid the flash) -->
     <script src="js/theme.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="css/theme.css" rel="stylesheet">
     <style>
         body { padding: 20px; }
-        .stat-box { 
-            background: var(--bg-tertiary); 
-            padding: 15px; 
-            border-radius: 5px; 
+        .stat-box {
+            background: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 5px;
             margin: 10px 0;
             border-left: 4px solid #007bff;
             color: var(--text-primary);
@@ -61,9 +61,9 @@ $cacheStats = $repo->getCacheStats();
     <div class="container">
         <h1>⚙️ Cache Management</h1>
         <p class="text-muted">Manage and monitor the system cache</p>
-        
+
         <hr>
-        
+
         <!-- Messages -->
         <?php if ($message): ?>
         <div class="alert alert-<?php echo $messageType; ?> alert-dismissible fade show" role="alert">
@@ -71,7 +71,7 @@ $cacheStats = $repo->getCacheStats();
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php endif; ?>
-        
+
         <!-- Cache Statistics -->
         <div class="card mb-4">
             <div class="card-header bg-primary text-white">
@@ -100,14 +100,14 @@ $cacheStats = $repo->getCacheStats();
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="mt-3">
                     <strong>Cache Directory:</strong><br>
                     <code><?php echo htmlspecialchars($cacheStats['cache_dir']); ?></code>
                 </div>
             </div>
         </div>
-        
+
         <!-- Cache Actions -->
         <div class="card">
             <div class="card-header bg-warning text-dark">
@@ -132,7 +132,7 @@ $cacheStats = $repo->getCacheStats();
                 </div>
             </div>
         </div>
-        
+
         <!-- Cache Info -->
         <div class="alert alert-info mt-4">
             <h6>ℹ️ Cache Configuration</h6>
@@ -143,7 +143,7 @@ $cacheStats = $repo->getCacheStats();
                 <li><strong>Auto-cleanup:</strong> Expired files removed on next access</li>
             </ul>
         </div>
-        
+
         <div class="mt-5">
             <a href="index.php" class="btn btn-secondary">← Back</a>
         </div>

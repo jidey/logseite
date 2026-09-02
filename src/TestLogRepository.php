@@ -1,30 +1,30 @@
 <?php
 /**
- * Classe Repository pour accéder aux logs de test
- * VERSION FINALE : Support complet du mapping par produit
- * 
- * Gère tous les cas (X15, X16, X17) avec produits (gWWebSel, weWebSel, gWClient)
+ * Repository class to access the test logs
+ * FINAL VERSION: Full support for the per-product mapping
+ *
+ * Handles all cases (X15, X16, X17) with products (gWWebSel, weWebSel, gWClient)
  */
 
 class TestLogRepository {
-    
+
     private $pdo;
     private $product_table_map;
-    private $cache;  // Nouvel attribut pour le cache
-    
+    private $cache;  // New attribute for the cache
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
-        
-        // Initialiser le cache
+
+        // Initialize the cache
         require_once __DIR__ . '/Cache.php';
         $this->cache = new Cache();
-        
-        // Récupérer le mapping depuis config.php
-        // Si not disponible, utiliser un mapping par défaut
+
+        // Get the mapping from config.php
+        // If not available, use a default mapping
         if (isset($GLOBALS['product_table_map'])) {
             $this->product_table_map = $GLOBALS['product_table_map'];
         } else {
-            // Mapping par défaut (si config.php n'a pas été chargé)
+            // Default mapping (if config.php was not loaded)
             $this->product_table_map = [
                 'rc_x18' => ['gWWebSel' => 'x18_rc', 'weWebSel' => 'we_rc', 'gWClient' => 'x18_gwrc'],
                 'hf_x18' => ['gWWebSel' => 'x18_hf', 'weWebSel' => 'we_hf', 'gWClient' => 'x18_gwhf'],
@@ -43,38 +43,38 @@ class TestLogRepository {
     }
     
     /**
-     * Récupère le nom de table pour un type de test et produit
-     * 
-     * @param string $testType (ex: 'rc_x17', 'hf_x16', 'dev_x15')
-     * @param string|null $product (ex: 'gWWebSel', 'weWebSel', 'gWClient')
+     * Gets the table name for a test type and product
+     *
+     * @param string $testType (e.g. 'rc_x17', 'hf_x16', 'dev_x15')
+     * @param string|null $product (e.g. 'gWWebSel', 'weWebSel', 'gWClient')
      * @return string
      * @throws Exception
      */
     public function getTableForTestType(string $testType, ?string $product = null): string {
-        // Branches feature : le testType EST le nom de la table
+        // Feature branches: the testType IS the table name
 		if ($testType === 'we_feat' || $testType === 'web_feat') {
 			return $testType;
 		}
-		// Vérifier que le testType existe
+		// Check that the testType exists
         if (!isset($this->product_table_map[$testType])) {
             throw new Exception("Unknown test type: " . htmlspecialchars($testType));
         }
-        
+
         $testTypeMap = $this->product_table_map[$testType];
-        
-        // Si un produit est spécifié, le vérifier
+
+        // If a product is specified, check it
         if ($product) {
             if (!isset($testTypeMap[$product])) {
                 throw new Exception("Unknown product for test type: " . htmlspecialchars($product));
             }
             $tableName = $testTypeMap[$product];
         } else {
-            // Si pas de produit, prendre le premier disponible
-            // (ou lever une exception si produit obligatoire)
-            $tableName = reset($testTypeMap); // Prend la première table
+            // If no product, take the first one available
+            // (or throw an exception if a product is required)
+            $tableName = reset($testTypeMap); // Takes the first table
         }
-        
-        // Validation de sécurité supplémentaire
+
+        // Additional security validation
         if (!preg_match('/^[a-z0-9_]+$/', $tableName)) {
             throw new Exception("Invalid table name format");
         }
@@ -83,8 +83,8 @@ class TestLogRepository {
     }
     
     /**
-     * Récupère les jobs disponibles pour une version et produit
-     * 
+     * Gets the available jobs for a version and product
+     *
      * @param string $testType
      * @param string|null $product
      * @return array
@@ -95,9 +95,9 @@ class TestLogRepository {
     ): array {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
-            
-            // Pour weWebSel, le Testtype dans la BD est le nom de la table (we_rc, we_hf, we_dev)
-            // Pour les autres, c'est le testType (rc_x17, hf_x17, dev_x17, etc)
+
+            // For weWebSel, the Testtype in the DB is the table name (we_rc, we_hf, we_dev)
+            // For the others, it's the testType (rc_x17, hf_x17, dev_x17, etc)
             $dbTestType = $testType;
             if ($product == "weWebSel") {
                 $dbTestType = $tableName;
@@ -125,8 +125,8 @@ class TestLogRepository {
     }
     
     /**
-     * Récupère les derniers exécutions de tests pour un job
-     * 
+     * Gets the latest test runs for a job
+     *
      * @param string $testType
      * @param string $jobName
      * @param string|null $product
@@ -143,14 +143,14 @@ class TestLogRepository {
     ): array {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
-            
-            // Pour weWebSel, le Testtype dans la BD est le nom de la table
+
+            // For weWebSel, the Testtype in the DB is the table name
             $dbTestType = $testType;
             if ($product == "weWebSel") {
                 $dbTestType = $tableName;
             }
-            
-            // Cette requête récupère la dernière exécution pour chaque paramètre unique
+
+            // This query retrieves the latest run for each unique parameter
             $query = "SELECT l1.* FROM `$tableName` l1 
                       LEFT JOIN `$tableName` l2 
                       ON (l1.JParam = l2.JParam 
@@ -182,12 +182,12 @@ class TestLogRepository {
             
             $stmt = $this->pdo->prepare($query);
             
-            // Bind les paramètres réguliers
+            // Bind the regular parameters
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value, PDO::PARAM_STR);
             }
-            
-            // Bind la limite en tant qu'entier
+
+            // Bind the limit as an integer
             $stmt->bindValue(':limit', min($limit, 500), PDO::PARAM_INT);
             
             $stmt->execute();
@@ -200,8 +200,8 @@ class TestLogRepository {
     }
     
     /**
-     * Récupère les détails d'une exécution spécifique
-     * 
+     * Gets the details of a specific run
+     *
      * @param string $testType
      * @param int $autoId
      * @param string|null $product
@@ -223,8 +223,8 @@ class TestLogRepository {
     }
     
     /**
-     * Marquer une exécution comme vérifiée
-     * 
+     * Marks a run as checked
+     *
      * @param string $testType
      * @param int $autoId
      * @param bool $checked
@@ -239,13 +239,13 @@ class TestLogRepository {
     ): bool {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
-            
-            // Si coché (Validated), changer le résultat en Flaky
+
+            // If checked (Validated), change the result to Flaky
             // TearDownFailed = 0, TearDownWarning = 1 (Flaky)
             if ($checked) {
                 $query = "UPDATE `$tableName` SET checked = :checked, TearDownFailed = 0, TearDownWarning = 1 WHERE AutoID = :autoid";
             } else {
-                // Si décoché, remettre le résultat en Failed
+                // If unchecked, set the result back to Failed
                 // TearDownFailed = 1, TearDownWarning = 0
                 $query = "UPDATE `$tableName` SET checked = :checked, TearDownFailed = 1, TearDownWarning = 0 WHERE AutoID = :autoid";
             }
@@ -261,8 +261,8 @@ class TestLogRepository {
     }
     
     /**
-     * Obtenir les statistiques pour une version
-     * 
+     * Gets the statistics for a version
+     *
      * @param string $testType
      * @param string|null $product
      * @return array
@@ -270,8 +270,8 @@ class TestLogRepository {
     public function getStatistics(string $testType, ?string $product = null): array {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
-            
-            // Pour weWebSel, le Testtype dans la BD est le nom de la table
+
+            // For weWebSel, the Testtype in the DB is the table name
             $dbTestType = $testType;
             if ($product == "weWebSel") {
                 $dbTestType = $tableName;
@@ -304,8 +304,8 @@ class TestLogRepository {
     }
     
     /**
-     * Rechercher les exécutions échouées non vérifiées
-     * 
+     * Finds unverified failed runs
+     *
      * @param string $testType
      * @param int $limit
      * @param string|null $product
@@ -318,8 +318,8 @@ class TestLogRepository {
     ): array {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
-            
-            // Pour weWebSel, le Testtype dans la BD est le nom de la table
+
+            // For weWebSel, the Testtype in the DB is the table name
             $dbTestType = $testType;
             if ($product == "weWebSel") {
                 $dbTestType = $tableName;
@@ -354,9 +354,9 @@ class TestLogRepository {
     }
     
     /**
-     * Exécuter une requête SELECT préparée
-     * Méthode interne de commodité
-     * 
+     * Executes a prepared SELECT query
+     * Internal convenience method
+     *
      * @param string $query
      * @param array $params
      * @return array
@@ -380,8 +380,8 @@ class TestLogRepository {
     }
     
     /**
-     * Vérifier que la table existe
-     * 
+     * Checks that the table exists
+     *
      * @param string $tableName
      * @return bool
      */
@@ -395,17 +395,17 @@ class TestLogRepository {
     }
     
     /**
-     * Obtenir les versions disponibles
-     * 
+     * Gets the available versions
+     *
      * @return array
      */
     public function getAvailableVersions(): array {
         return array_keys($this->product_table_map);
     }
-    
+
     /**
-     * Obtenir les produits disponibles pour une version
-     * 
+     * Gets the available products for a version
+     *
      * @param string $testType
      * @return array
      */
@@ -417,61 +417,61 @@ class TestLogRepository {
     }
     
     /**
-     * Obtenir le mapping complet (pour debug)
-     * 
+     * Gets the full mapping (for debugging)
+     *
      * @return array
      */
     public function getMapping(): array {
         return $this->product_table_map;
     }
-    
+
     /**
-     * Obtenir les TestTypes disponibles pour un produit (basé sur les données réelles)
-     * 
+     * Gets the available TestTypes for a product (based on the actual data)
+     *
      * @param string $product
      * @return array
      */
     public function getAvailableTestTypesForProduct(string $product): array {
-        // Vérifier le cache d'abord
+        // Check the cache first
         $cacheKey = "testTypes_{$product}";
         $cached = $this->cache->get($cacheKey);
-        
+
         if ($cached !== null) {
             return $cached;
         }
-        
+
         $availableTestTypes = [];
-        
-        // Pour weWebSel, retourner uniquement les versions X18, X17
+
+        // For weWebSel, return only the X18, X17 versions
         if ($product === "weWebSel") {
             $availableTestTypes = ['dev_x18', 'rc_x18', 'hf_x18', 'dev_x17', 'rc_x17', 'hf_x17'];
-            // Cacher pendant 1 heure (3600 secondes)
+            // Cache for 1 hour (3600 seconds)
             $this->cache->set($cacheKey, $availableTestTypes, 3600);
             return $availableTestTypes;
         }
-        
-        // Pour chaque version, vérifier si le produit existe dans le mapping.
-        // Depuis la centralisation (config/versions_config.php), une branche
-        // marquée 'active'/'future' pour ce produit est affichée directement,
-        // sans requête de comptage : plus besoin d'attendre que des données
-        // existent en base pour qu'une version nouvellement ajoutée apparaisse
-        // dans le sélecteur (voir config/versions_config.php pour le statut
-        // de chaque branche : 'active' | 'future' | 'retired').
+
+        // For each version, check whether the product exists in the mapping.
+        // Since centralization (config/versions_config.php), a branch marked
+        // 'active'/'future' for this product is displayed directly, without
+        // a counting query: no need to wait for data to exist in the database
+        // for a newly added version to appear in the selector (see
+        // config/versions_config.php for each branch's status:
+        // 'active' | 'future' | 'retired').
         foreach ($this->product_table_map as $testType => $products) {
             if (isset($products[$product])) {
                 $availableTestTypes[] = $testType;
             }
         }
-        
-        // Cacher le résultat pendant 1 heure (3600 secondes)
+
+        // Cache the result for 1 hour (3600 seconds)
         $this->cache->set($cacheKey, $availableTestTypes, 3600);
         
         return $availableTestTypes;
     }
     
     /**
-     * Récupérer les notes/tags pour un TestSet
-     * 
+     * Gets the notes/tags for a TestSet
+     *
      * @param string $testType
      * @param string $jJob
      * @param string $jParam
@@ -482,8 +482,8 @@ class TestLogRepository {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
             $tagsTableName = $tableName . '_tags';
-            
-            // Vérifier que la table _tags existe
+
+            // Check that the _tags table exists
             if (!$this->tableExists($tagsTableName)) {
                 return null;
             }
@@ -508,23 +508,23 @@ class TestLogRepository {
     }
     
     /**
-     * Vider le cache (utile après les mises à jour)
-     * @return int Nombre de fichiers supprimés
+     * Clears the cache (useful after updates)
+     * @return int Number of files deleted
      */
     public function clearCache() {
         return $this->cache->flush();
     }
-    
+
     /**
-     * Nettoyer les fichiers de cache expiré
-     * @return int Nombre de fichiers supprimés
+     * Cleans up expired cache files
+     * @return int Number of files deleted
      */
     public function cleanupCache() {
         return $this->cache->cleanup();
     }
-    
+
     /**
-     * Obtenir les stats du cache (pour debug)
+     * Gets the cache stats (for debugging)
      * @return array
      */
     public function getCacheStats() {

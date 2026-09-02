@@ -1,19 +1,19 @@
 <?php
 /**
  * LAZYLOAD.PHP
- * Gestionnaire de chargement lazy des images
- * Utilise l'Intersection Observer API (JavaScript côté client)
+ * Lazy loading manager for images
+ * Uses the Intersection Observer API (client-side JavaScript)
  */
 
 class LazyLoad {
-    
+
     /**
-     * Générer une image avec lazy loading
-     * @param string $src - URL source
-     * @param string $alt - Texte alternatif
-     * @param string $title - Titre (optionnel)
-     * @param string $class - Classe CSS (optionnel)
-     * @return string - HTML de l'image
+     * Generate an image with lazy loading
+     * @param string $src - Source URL
+     * @param string $alt - Alt text
+     * @param string $title - Title (optional)
+     * @param string $class - CSS class (optional)
+     * @return string - Image HTML
      */
     public static function image($src, $alt = '', $title = '', $class = '') {
         $classStr = $class ? " class=\"$class\"" : '';
@@ -33,11 +33,11 @@ class LazyLoad {
     }
     
     /**
-     * Générer une image responsive avec lazy loading
-     * @param string $src - URL source (mobile)
-     * @param string $srcDesktop - URL source desktop (optionnel)
-     * @param string $alt - Texte alternatif
-     * @return string - HTML de l'image responsive
+     * Generate a responsive image with lazy loading
+     * @param string $src - Source URL (mobile)
+     * @param string $srcDesktop - Desktop source URL (optional)
+     * @param string $alt - Alt text
+     * @return string - Responsive image HTML
      */
     public static function imageResponsive($src, $srcDesktop = '', $alt = '') {
         $placeholder = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect fill="%23f0f0f0" width="400" height="300"/%3E%3C/svg%3E';
@@ -53,10 +53,10 @@ class LazyLoad {
     }
     
     /**
-     * Générer une image background avec lazy loading
-     * @param string $src - URL source
-     * @param string $selector - Sélecteur CSS
-     * @return string - Style inline
+     * Generate a background image with lazy loading
+     * @param string $src - Source URL
+     * @param string $selector - CSS selector
+     * @return string - Inline style
      */
     public static function backgroundImage($src, $selector = 'div') {
         return sprintf(

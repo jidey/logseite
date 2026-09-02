@@ -1,18 +1,18 @@
 <?php
 /**
  * ADVANCEDOPTIMIZATION.PHP
- * Optimisations avancées : GZIP, CDN, Service Worker, etc.
+ * Advanced optimizations: GZIP, CDN, Service Worker, etc.
  */
 
 class AdvancedOptimization {
-    
+
     /**
-     * Activer GZIP compression
-     * À appeler au début du script PHP
+     * Enable GZIP compression
+     * To be called at the start of the PHP script
      */
     public static function enableGzip() {
         if (!headers_sent()) {
-            // Vérifier le support GZIP du navigateur
+            // Check the browser's GZIP support
             if (strpos($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '', 'gzip') !== false) {
                 ob_start('ob_gzhandler');
             }
@@ -20,8 +20,8 @@ class AdvancedOptimization {
     }
     
     /**
-     * Ajouter les headers de cache
-     * @param int $ttl - Durée de vie en secondes
+     * Add the cache headers
+     * @param int $ttl - Time to live in seconds
      */
     public static function setCacheHeaders($ttl = 3600) {
         if (!headers_sent()) {
@@ -33,42 +33,42 @@ class AdvancedOptimization {
     }
     
     /**
-     * Ajouter les headers de sécurité
+     * Add the security headers
      */
     public static function setSecurityHeaders() {
         if (!headers_sent()) {
-            // Prévenir le clickjacking
+            // Prevent clickjacking
             header('X-Frame-Options: SAMEORIGIN');
-            // Prévenir le MIME sniffing
+            // Prevent MIME sniffing
             header('X-Content-Type-Options: nosniff');
-            // Activer le XSS Protection
+            // Enable XSS Protection
             header('X-XSS-Protection: 1; mode=block');
-            // Content Security Policy (basique)
+            // Content Security Policy (basic)
             header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net");
         }
     }
     
     /**
-     * Ajouter les headers pour la performance
+     * Add the performance headers
      */
     public static function setPerformanceHeaders() {
         if (!headers_sent()) {
-            // Preload les ressources critiques
+            // Preload the critical resources
             header('Link: </public/css/styles.min.css>; rel=preload; as=style', false);
             header('Link: </public/js/app.min.js>; rel=preload; as=script', false);
-            // DNS Prefetch pour CDN
+            // DNS Prefetch for CDN
             header('Link: <https://cdn.jsdelivr.net>; rel=dns-prefetch', false);
         }
     }
     
     /**
-     * Générer un Service Worker registration script
-     * @return string - Script HTML
+     * Generate a Service Worker registration script
+     * @return string - HTML script
      */
     public static function registerServiceWorker() {
         return <<<'HTML'
 <script>
-// Enregistrer le Service Worker pour offline support
+// Register the Service Worker for offline support
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -81,8 +81,8 @@ HTML;
     }
     
     /**
-     * Ajouter le preload pour les fonts
-     * @param array $fonts - Array de URLs de fonts
+     * Add the preload for fonts
+     * @param array $fonts - Array of font URLs
      */
     public static function preloadFonts($fonts = []) {
         if (!headers_sent()) {
@@ -93,11 +93,11 @@ HTML;
     }
     
     /**
-     * Optimiser les images avec srcset
+     * Optimize images with srcset
      * @param string $src - URL mobile/small screen
-     * @param array $sizes - Array de tailles [480=>url, 768=>url, 1200=>url]
-     * @param string $alt - Texte alternatif
-     * @return string - HTML img tag avec srcset
+     * @param array $sizes - Array of sizes [480=>url, 768=>url, 1200=>url]
+     * @param string $alt - Alt text
+     * @return string - HTML img tag with srcset
      */
     public static function responsiveImage($src, $sizes = [], $alt = '') {
         $srcset = htmlspecialchars($src);
@@ -115,15 +115,15 @@ HTML;
     }
     
     /**
-     * Minifier HTML
-     * @param string $html - HTML à minifier
-     * @return string - HTML minifié
+     * Minify HTML
+     * @param string $html - HTML to minify
+     * @return string - Minified HTML
      */
     public static function minifyHtml($html) {
-        // Supprimer les commentaires
+        // Remove the comments
         $html = preg_replace('/<!--(.|\s)*?-->/', '', $html);
-        
-        // Supprimer les espaces inutiles
+
+        // Remove unnecessary whitespace
         $html = preg_replace('/\s+/', ' ', $html);
         $html = preg_replace('/>\s+</', '><', $html);
         
@@ -131,8 +131,8 @@ HTML;
     }
     
     /**
-     * Analyser la performance
-     * @return array - Métriques de performance
+     * Analyze performance
+     * @return array - Performance metrics
      */
     public static function getPerformanceMetrics() {
         return [
@@ -144,7 +144,7 @@ HTML;
     }
     
     /**
-     * Ajouter les headers HTTP/2 Push
+     * Add the HTTP/2 Push headers
      */
     public static function http2Push() {
         if (!headers_sent() && isset($_SERVER['HTTP2'])) {

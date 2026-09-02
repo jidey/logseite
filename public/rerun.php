@@ -5,8 +5,8 @@
  * Modernized version with Bootstrap 5 and LOGG styles
  */
 
-// Fichier central de configuration des versions/branches (pas besoin de la
-// connexion DB ici, donc on charge uniquement versions_config.php)
+// Central configuration file for versions/branches (no need for the
+// DB connection here, so only versions_config.php is loaded)
 require_once __DIR__ . '/../config/versions_config.php';
 
 // Read the GET parameters
@@ -21,6 +21,12 @@ $FilterResults = $_GET['Filter'] ?? "no";
 $Testtype = $_GET['Testtype'] ?? "";
 $Testset = $_GET['Testset'] ?? "";
 $TCProj = $_GET['TCProj'] ?? "";
+// Batch mode: multiple TCProj separated by "|||" (from details.php "Run All Failed")
+$TCProjList = isset($_GET['TCProjList']) ? explode('|||', $_GET['TCProjList']) : [];
+$isBatch = !empty($TCProjList);
+// AutoID of each failed scenario, aligned by index with $TCProjList
+// (both use plain explode without array_filter, so the indexes stay in sync)
+$AutoIDList = isset($_GET['AutoIDList']) ? explode('|||', $_GET['AutoIDList']) : [];
 $TestName = $_GET['TestName'] ?? "";
 // An unchecked checkbox sends NOTHING in the query string.
 // The "checked by default" value must therefore only apply on the initial load,
@@ -34,7 +40,7 @@ $DBServer = $_GET['DBServer'] ?? "SQL";  // SQL by default (SQL | PGS)
 // Determine the calling page (index.php or details.php)
 // If TCProj is present, the call comes from details.php (ReRun Testcase)
 // Otherwise, it comes from index.php (Run complete TestSet)
-$pageTitle = !empty($TCProj) ? "ReRun Testcase" : "Run complete TestSet";
+$pageTitle = $isBatch ? "ReRun All Failed (" . count($TCProjList) . ")" : (!empty($TCProj) ? "ReRun Testcase" : "Run complete TestSet");
 
 // Browser
 if (isset($_GET['TestBrowser'])) {
@@ -137,12 +143,12 @@ $execute = $formSubmitted;
 if ($execute) {
     if (isset($_GET['Confirm'])) {
         // Determine the test node depending on the version.
-        // Each version has its own parameter (Test_Node pour smartWe,
-        // Test_x17, Test_x18, ... pour gW Web/Desktop). Le nom du paramètre
-        // est déduit dynamiquement du numéro de version présent dans
-        // $LogVersion (ex: "x19_dev" -> "Test_x19") : aucune modification
-        // n'est nécessaire ici lors de l'ajout d'une nouvelle version, voir
-        // runsystems.php qui génère le champ correspondant.
+        // Each version has its own parameter (Test_Node for smartWe,
+        // Test_x17, Test_x18, ... for gW Web/Desktop). The parameter name
+        // is dynamically derived from the version number present in
+        // $LogVersion (e.g. "x19_dev" -> "Test_x19"): no change is
+        // needed here when a new version is added, see runsystems.php
+        // which generates the corresponding field.
         $Test_x = 'Grid'; // Default
 
         if (substr($LogVersion, 0, 2) == "we") {
@@ -151,8 +157,36 @@ if ($execute) {
             $Test_x = $_GET['Test_' . $verMatch[0]] ?? 'Grid';
         }
 
-		ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug, 
-                     $localrun, $parallel, $Build, $retry, $DBServer);
+		if ($isBatch) {
+			// Batch: run the same parameters for every failed TCProj
+			foreach ($TCProjList as $idx => $oneTCProj) {
+				$oneTCProj = explode(" outline", $oneTCProj)[0];
+				// Rebuild the test URL for this specific scenario
+				$testOne = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins .
+						   "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . urlencode($oneTCProj) .
+						   "&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;
+				if ($Product == "weWebSel")      $testOne .= "&Product=We";
+				elseif ($Product == "gWWebSel")  $testOne .= "&Product=Web";
+				else                             $testOne .= "&Product=error";
+
+				// Rebuild the check.php URL for THIS scenario (its own AutoID)
+				// so each failed scenario gets running=2 in the details table.
+				$oneAutoID = $AutoIDList[$idx] ?? '';
+				$runnOne = $protocol . "://" . $host . $basePath . "/check.php?value=2" .
+						   "&autoid=" . urlencode($oneAutoID) .
+						   "&LogVersion=" . urlencode($LogVersion) .
+						   "&Testtype=" . urlencode($Testtype) .
+						   "&Product=" . urlencode($Product);
+
+				ConfirmAndRun($testOne, $runnOne, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
+							 $localrun, $parallel, $Build, $retry, $DBServer, false); // false = don't redirect yet
+			}
+			header("Location: " . $logurl);
+			exit;
+		} else {
+		    ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
+		                 $localrun, $parallel, $Build, $retry, $DBServer);
+		}			 
     } elseif (isset($_GET['Abort'])) {
         header("Location: " . $logurl);
         exit;
@@ -415,7 +449,9 @@ if ($execute) {
                     <div><strong>Build:</strong> <?php echo htmlspecialchars($Build); ?></div>
                     <div><strong>Product:</strong> <?php echo htmlspecialchars($Product); ?></div>
                     <div><strong>Browser:</strong> <?php echo htmlspecialchars($TestBrowser); ?></div>
-                    <?php if (!empty($TCProj)): ?>
+					<?php if ($isBatch): ?>
+                        <div><strong>Scenarios:</strong> <?php echo count($TCProjList); ?> failed test(s)</div>
+                    <?php elseif (!empty($TCProj)): ?>
                         <div><strong>Scenario:</strong> <?php echo htmlspecialchars($TCProj); ?></div>
                     <?php endif; ?>
                 </div>
@@ -479,6 +515,7 @@ if ($execute) {
                     <input type="hidden" name="Testtype" value="<?php echo htmlspecialchars($Testtype); ?>">
                     <input type="hidden" name="Testset" value="<?php echo htmlspecialchars($Testset); ?>">
                     <input type="hidden" name="TCProj" value="<?php echo htmlspecialchars($TCProj); ?>">
+					<input type="hidden" name="TCProjList" value="<?php echo htmlspecialchars($_GET['TCProjList'] ?? ''); ?>">
                     <input type="hidden" name="TestName" value="<?php echo htmlspecialchars($TestName); ?>">
                     <input type="hidden" name="TestBrowser" value="<?php echo htmlspecialchars($TestBrowser); ?>">
                     <input type="hidden" name="Hub" value="<?php echo htmlspecialchars($Hub); ?>">
@@ -583,11 +620,33 @@ if ($execute) {
 /**
  * Confirm and launch the test
  */
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer) {
+/**
+ * Helper sending a GET request (declared once at file scope so it can be
+ * called repeatedly, including from ConfirmAndRun in batch mode).
+ */
+function sendGetRequest($url) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HTTPGET, true);          // GET method
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    // Follow the redirects
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    return ['code' => $httpCode, 'response' => $response, 'error' => $error];
+}
+
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $doRedirect = true) {
     $Test_y = "&Test_Node=" . $Test_x;
 
-    // Map the branches (testType -> branche Git Jenkins)
-    // Mapping centralisé dans config/versions_config.php ($LOGG_JENKINS_BRANCH_MAP)
+    // Map the branches (testType -> Jenkins Git branch)
+    // Centralized mapping in config/versions_config.php ($LOGG_JENKINS_BRANCH_MAP)
     global $LOGG_JENKINS_BRANCH_MAP;
     $branch = $LOGG_JENKINS_BRANCH_MAP[$branch] ?? $branch;
     
@@ -633,26 +692,9 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     
     // Send the requests via GET (Jenkins reads the URL/query string parameters)
     // Just like pasting the URL directly into the browser
-    
-    // Helper sending a GET request
-    function sendGetRequest($url) {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPGET, true);          // GET method
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    // Follow the redirects
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        return ['code' => $httpCode, 'response' => $response, 'error' => $error];
-    }
-    
+    // (sendGetRequest is declared once at file scope - see below - so it is
+    //  safe to call ConfirmAndRun multiple times in batch mode)
+
     // Send the check request (check.php: sets running=2)
     @sendGetRequest($runn);
     
@@ -660,7 +702,10 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     @sendGetRequest($test);
     
     // Redirect back to the log
-    header("Location: " . $logurl);
-    exit;
+  // Redirect back to the log (skipped in batch mode until the last scenario)
+    if ($doRedirect) {
+        header("Location: " . $logurl);
+        exit;
+    }
 }
 ?>

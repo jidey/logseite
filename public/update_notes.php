@@ -1,8 +1,8 @@
 <?php
 /**
  * UPDATE_NOTES.PHP
- * Endpoint AJAX pour éditer les notes inline dans le tableau
- * Sauvegarde dans la table *_tags
+ * AJAX endpoint to edit notes inline in the table
+ * Saves into the *_tags table
  */
 
 require_once '../config/config.php';
@@ -10,7 +10,7 @@ require_once '../src/TestLogRepository.php';
 
 header('Content-Type: application/json');
 
-// Récupérer les paramètres POST
+// Get the POST parameters
 $autoID = $_POST['AutoID'] ?? null;
 $testType = $_POST['Testtype'] ?? null;
 $product = $_POST['Product'] ?? null;
@@ -26,7 +26,7 @@ if (!$autoID || !$testType || !$product) {
 try {
     $repo = new TestLogRepository($pdo);
     
-    // Récupérer le détail du TestSet pour obtenir JJob et JParam
+    // Get the TestSet detail to obtain JJob and JParam
     $runDetails = $repo->getRunDetails($testType, $autoID, $product);
     
     if (!$runDetails) {
@@ -38,11 +38,11 @@ try {
     $jJob = $runDetails['JJob'];
     $jParam = $runDetails['JParam'];
     
-    // Récupérer le nom de la table pour le TestType
+    // Get the table name for the TestType
     $tableName = $repo->getTableForTestType($testType, $product);
     $tagsTable = $tableName . '_tags';
-    
-    // Vérifier si la ligne existe dans _tags
+
+    // Check whether the row exists in _tags
     $query = "SELECT * FROM `$tagsTable` 
               WHERE JJob = :jjob 
               AND JParam = :jparam 

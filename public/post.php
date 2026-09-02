@@ -77,7 +77,7 @@
 	$LogLink = str_replace('Grid', 'Grid-x.7', $LogLink);
 
 	// For gWClient: resolve the table (LogVersion) from the Testtype
-	// Mapping centralisé dans config/versions_config.php ($LOGG_GWCLIENT_MAP)
+	// Centralized mapping in config/versions_config.php ($LOGG_GWCLIENT_MAP)
 	if ($Product === 'gWClient') {
 		if (isset($LOGG_GWCLIENT_MAP[$Testtype])) {
 			$LogVersion = $LOGG_GWCLIENT_MAP[$Testtype];

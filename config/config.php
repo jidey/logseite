@@ -4,11 +4,11 @@
  * Configuration PDO pour MySQL
  */
 
-// Fichier central de configuration des versions/branches (gW Web, gW Desktop, smartWe)
-// -> voir config/versions_config.php pour ajouter/retirer une version
+// Central configuration file for versions/branches (gW Web, gW Desktop, smartWe)
+// -> see config/versions_config.php to add/remove a version
 require_once __DIR__ . '/versions_config.php';
 
-// Rendre le mapping table disponible pour TestLogRepository.php
+// Make the table mapping available to TestLogRepository.php
 $GLOBALS['product_table_map'] = $product_table_map;
 
 // Database credentials
@@ -35,7 +35,7 @@ try {
     die("Database connection failed: " . htmlspecialchars($e->getMessage()));
 }
 
-// Vérifier que $pdo est bien défini
+// Verify that $pdo is properly defined
 if (!isset($pdo) || $pdo === null) {
     error_log("ERROR: \$pdo is null after connection attempt");
     die("Database configuration error: \$pdo is not defined");
