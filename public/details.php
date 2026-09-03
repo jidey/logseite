@@ -419,12 +419,13 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                             <th style="width: 70px;">Log</th>
                             <th style="width: 80px; text-align: center;">Last Run Date</th>
                             <th style="width: 70px;">Validated</th>
+                            <th style="width: 70px;">Delete</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($scenarios)): ?>
                         <tr>
-                            <td colspan="13" class="text-center text-muted py-4">
+                            <td colspan="14" class="text-center text-muted py-4">
                                 No scenarios found for this TestSet
                             </td>
                         </tr>
@@ -574,6 +575,16 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     <input type="checkbox" class="form-check-input"
                                            <?php echo ($scenario['checked'] ?? 0) ? 'checked' : ''; ?>
                                            onchange="updateScenarioValidation(<?php echo $scenario['AutoID']; ?>, this.checked, '<?php echo htmlspecialchars($testType); ?>', '<?php echo htmlspecialchars($product); ?>')">
+                                </td>
+
+                                <!-- Delete -->
+                                <td class="text-center">
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger delete-scenario-btn"
+                                            title="Delete this scenario"
+                                            onclick="deleteScenario(<?php echo (int)$scenario['AutoID']; ?>, '<?php echo htmlspecialchars($testType, ENT_QUOTES); ?>', '<?php echo htmlspecialchars($product, ENT_QUOTES); ?>', this)">
+                                        🗑️
+                                    </button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -738,6 +749,40 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                     btnElement.style.pointerEvents = 'auto';
                     alert('Error resetting running status: ' + error.message);
                 });
+        }
+
+        // Handle the click on the Delete button - global function called by the inline onclick
+        function deleteScenario(autoID, testType, product, btnElement) {
+            btnElement.disabled = true;
+            btnElement.style.opacity = '0.5';
+
+            fetch('delete_scenario.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'AutoID=' + encodeURIComponent(autoID) +
+                      '&TestType=' + encodeURIComponent(testType) +
+                      '&Product=' + encodeURIComponent(product)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const row = document.querySelector('tr[data-autoid="' + autoID + '"]');
+                    if (row) {
+                        row.style.transition = 'opacity 0.3s ease';
+                        row.style.opacity = '0';
+                        setTimeout(function() { row.remove(); }, 300);
+                    }
+                } else {
+                    btnElement.disabled = false;
+                    btnElement.style.opacity = '1';
+                    alert('Error: ' + (data.message || 'Unable to delete this scenario'));
+                }
+            })
+            .catch(error => {
+                btnElement.disabled = false;
+                btnElement.style.opacity = '1';
+                alert('Network error while deleting: ' + error.message);
+            });
         }
 
         // Recompute on resize

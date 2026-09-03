@@ -45,13 +45,16 @@ if (!isset($pdo) || $pdo === null) {
 }
 
 /**
- * Base URL of the app, auto-detected from the current request path.
- * Works whether the app runs under /logg/public or /logdev/public,
- * so dev and prod need no manual switch.
+ * Base URL of the app.
+ * Fixed to the real server host (never "localhost"), so links generated
+ * by dash.php always work regardless of the port/host used to reach
+ * the dev instance (e.g. localhost:3080).
+ * Folder (logdev vs logg) is still auto-detected from the current script
+ * path, so dev and prod need no manual switch.
  */
 if (!defined('LOGG_BASE_URL')) {
-    $scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host    = $_SERVER['HTTP_HOST'] ?? 'sqs-sel-cent1.cas-software.dev';
+    $scheme  = 'https';
+    $host    = 'sqs-sel-cent1.cas-software.dev';
     // Folder = the segment before "/public" in the current script path
     // e.g. /logdev/public/index.php  ->  "logdev"
     $script  = $_SERVER['SCRIPT_NAME'] ?? '/logg/public/index.php';
