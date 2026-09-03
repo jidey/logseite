@@ -23,9 +23,8 @@ $Testset = $_GET['Testset'] ?? "";
 $TCProj = $_GET['TCProj'] ?? "";
 // Batch mode: multiple TCProj separated by "|||" (from details.php "Run All Failed")
 $TCProjList = isset($_GET['TCProjList']) ? explode('|||', $_GET['TCProjList']) : [];
-$isBatch = !empty($TCProjList);
+$isBatch = !empty($TCProjList) && $_GET['TCProjList'] !== '';
 // AutoID of each failed scenario, aligned by index with $TCProjList
-// (both use plain explode without array_filter, so the indexes stay in sync)
 $AutoIDList = isset($_GET['AutoIDList']) ? explode('|||', $_GET['AutoIDList']) : [];
 $TestName = $_GET['TestName'] ?? "";
 // An unchecked checkbox sends NOTHING in the query string.
@@ -36,7 +35,9 @@ $localrun = $_GET['localrun'] ?? ($formSubmitted ? 'no' : 'localrun');  // ✅ C
 $parallel = $_GET['parallel'] ?? 'no';                                  // ✅ Unchecked by default
 $retry    = $_GET['retry']    ?? ($formSubmitted ? 'no' : 'retry');     // ✅ Checked by default
 $DBServer = $_GET['DBServer'] ?? "SQL";  // SQL by default (SQL | PGS)
-
+// Debug mode: when &DryRun=1 is present, ConfirmAndRun DISPLAYS the URLs
+// instead of sending them to Jenkins/check.php (nothing is executed).
+$dryRun = 0; //1 = active DryRun
 // Determine the calling page (index.php or details.php)
 // If TCProj is present, the call comes from details.php (ReRun Testcase)
 // Otherwise, it comes from index.php (Run complete TestSet)
@@ -179,13 +180,13 @@ if ($execute) {
 						   "&Product=" . urlencode($Product);
 
 				ConfirmAndRun($testOne, $runnOne, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
-							 $localrun, $parallel, $Build, $retry, $DBServer, false); // false = don't redirect yet
+							 $localrun, $parallel, $Build, $retry, $DBServer, false, $dryRun); // false = don't redirect yet
 			}
-			header("Location: " . $logurl);
+			//header("Location: " . $logurl);
 			exit;
 		} else {
 		    ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
-		                 $localrun, $parallel, $Build, $retry, $DBServer);
+		                 $localrun, $parallel, $Build, $retry, $DBServer, true, $dryRun);
 		}			 
     } elseif (isset($_GET['Abort'])) {
         header("Location: " . $logurl);
@@ -516,6 +517,7 @@ if ($execute) {
                     <input type="hidden" name="Testset" value="<?php echo htmlspecialchars($Testset); ?>">
                     <input type="hidden" name="TCProj" value="<?php echo htmlspecialchars($TCProj); ?>">
 					<input type="hidden" name="TCProjList" value="<?php echo htmlspecialchars($_GET['TCProjList'] ?? ''); ?>">
+					<input type="hidden" name="AutoIDList" value="<?php echo htmlspecialchars($_GET['AutoIDList'] ?? ''); ?>">
                     <input type="hidden" name="TestName" value="<?php echo htmlspecialchars($TestName); ?>">
                     <input type="hidden" name="TestBrowser" value="<?php echo htmlspecialchars($TestBrowser); ?>">
                     <input type="hidden" name="Hub" value="<?php echo htmlspecialchars($Hub); ?>">
@@ -642,7 +644,7 @@ function sendGetRequest($url) {
     return ['code' => $httpCode, 'response' => $response, 'error' => $error];
 }
 
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $doRedirect = true) {
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $doRedirect = true, $dryRun) {
     $Test_y = "&Test_Node=" . $Test_x;
 
     // Map the branches (testType -> Jenkins Git branch)
@@ -692,8 +694,18 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     
     // Send the requests via GET (Jenkins reads the URL/query string parameters)
     // Just like pasting the URL directly into the browser
-    // (sendGetRequest is declared once at file scope - see below - so it is
-    //  safe to call ConfirmAndRun multiple times in batch mode)
+    // (sendGetRequest is declared once at file scope so it stays safe to call
+    //  ConfirmAndRun multiple times in batch mode)
+
+    if ($dryRun) {
+        // DEBUG: display the URLs instead of sending them (nothing executed)
+        echo '<div style="font-family:monospace; font-size:13px; margin:10px; padding:12px; border:1px solid #ccc; background:#f8f8f8; word-break:break-all;">';
+        echo '<strong style="color:#d63384;">🐞 DRY RUN (no request sent)</strong><br><br>';
+        echo '<strong>check.php URL:</strong><br>' . htmlspecialchars($runn) . '<br><br>';
+        echo '<strong>Jenkins URL:</strong><br>' . htmlspecialchars($test) . '<br>';
+        echo '</div>';
+        return; // do NOT send, do NOT redirect
+    }
 
     // Send the check request (check.php: sets running=2)
     @sendGetRequest($runn);
@@ -701,9 +713,8 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     // Send the test request to Jenkins
     @sendGetRequest($test);
     
-    // Redirect back to the log
-  // Redirect back to the log (skipped in batch mode until the last scenario)
-    if ($doRedirect) {
+    // Redirect back to the log (skipped in batch mode until the last scenario)
+	if ($doRedirect) {
         header("Location: " . $logurl);
         exit;
     }

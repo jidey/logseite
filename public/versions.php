@@ -1,6 +1,6 @@
 <?php
 
-$directory = "deployedVM";
+$directory = SHARED_DATA_DIR . "deployedVM";
 $files = scandir($directory);
 $results = [];
 

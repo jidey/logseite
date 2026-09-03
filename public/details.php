@@ -27,7 +27,7 @@ function getDeployedBuild($testType, $product) {
         if (count($parts) == 2) {
             $branch = $parts[0]; // dev, rc, hf
             $suffix = "we" . strtolower($branch); // wedev, werc, wehf
-            $deployFile = __DIR__ . "/deployedVM/lastWe{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "deployedVM/lastWe{$suffix}Deploy.txt";
         }
     } else {
         // gWWebSel: testtype format is "rc_x17", "dev_x17", "hf_x17"
@@ -37,7 +37,7 @@ function getDeployedBuild($testType, $product) {
             $branch = $parts[0];
             $version = str_replace("x", "", $parts[1]);
             $suffix = $branch . $version;
-            $deployFile = __DIR__ . "/deployedVM/lastSel{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "/deployedVM/lastSel{$suffix}Deploy.txt";
         }
     }
 
@@ -390,7 +390,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                     "&TestBrowser=". urlencode($browser ?? 'chrome') .
                     "&TCProjList=" . urlencode(implode('|||', $failedTCProjs)) .
                     "&AutoIDList=" . urlencode(implode('|||', $failedAutoIDs)) .
-                    "&url="        . urlencode('https://sqs-sel-cent1.cas-software.dev/logg/public/details.php?' .
+                                        "&url="        . urlencode(LOGG_BASE_URL . '/details.php?' .
                                     'Testtype=' . urlencode($testType) .
                                     '&Product=' . urlencode($product) .
                                     '&AutoID=' . urlencode($testset['AutoID'] ?? ''));
@@ -504,7 +504,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                                    "&LogVersion=" . urlencode($testType) .
                                                    "&Product=" . urlencode($product) .
                                                    "&TestBrowser=" . urlencode($browser ?? 'chrome') .
-                                                   "&url=" . urlencode('https://sqs-sel-cent1.cas-software.dev/logg/public/details.php?' .
+                                                   "&url=" . urlencode(LOGG_BASE_URL . '/details.php?' .
                                                        'Testtype=' . urlencode($testType) .
                                                        '&Product=' . urlencode($product) .
                                                        '&AutoID=' . urlencode($testset['AutoID'] ?? ''));
@@ -593,6 +593,10 @@ $productsForVersion = $repo->getProductsForVersion($testType);
 
     <!-- Theme Toggle Script -->
     <script>
+        // Whether the "Failed Only" filter is active (exposed from PHP).
+        // Used to hide a scenario row instantly when it is validated.
+        const LOGG_ONLY_FAILED = <?php echo $onlyFailed ? 'true' : 'false'; ?>;
+
         // Compute and adjust the sticky positions
         function updateStickyPositions() {
             const header = document.querySelector('.header');
@@ -882,6 +886,18 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 if (isChecked) {
                     resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
                     updateCounters(dPassed, dFlaky, dFailed);
+
+                    // In "Failed Only" view, a validated scenario counts as Passed,
+                    // so it no longer belongs in the list: hide its row instantly.
+                    // Read the CURRENT state of the toggle (not just the PHP/URL value),
+                    // because the filter can be active via the restored radio button too.
+                    const failedOnlyBtn = document.getElementById('onlyFailedBtn');
+                    const isFailedOnly = LOGG_ONLY_FAILED || (failedOnlyBtn && failedOnlyBtn.checked);
+                    if (isFailedOnly) {
+                        row.style.transition = 'opacity 0.3s ease';
+                        row.style.opacity = '0';
+                        setTimeout(function() { row.remove(); }, 300);
+                    }
                 } else {
                     if (origin === 'Failed')      resultCell.innerHTML = '<span class="result-badge result-failed">❌ Failed</span>';
                     else if (origin === 'Flaky')  resultCell.innerHTML = '<span class="result-badge result-flaky">⚠️ Flaky</span>';

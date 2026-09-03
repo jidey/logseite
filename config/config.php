@@ -17,6 +17,9 @@ $db_name = 'testcomplete';
 $db_user = 'root';
 $db_pass = '';
 
+define('SHARED_DATA_DIR', dirname(__DIR__, 2) . DIRECTORY_SEPARATOR);
+// depuis logg/config/ ou logdev/config/, dirname(__DIR__, 2) remonte à htdocs/
+   
 try {
     // Create PDO connection
     $pdo = new PDO(
@@ -41,4 +44,19 @@ if (!isset($pdo) || $pdo === null) {
     die("Database configuration error: \$pdo is not defined");
 }
 
+/**
+ * Base URL of the app, auto-detected from the current request path.
+ * Works whether the app runs under /logg/public or /logdev/public,
+ * so dev and prod need no manual switch.
+ */
+if (!defined('LOGG_BASE_URL')) {
+    $scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host    = $_SERVER['HTTP_HOST'] ?? 'sqs-sel-cent1.cas-software.dev';
+    // Folder = the segment before "/public" in the current script path
+    // e.g. /logdev/public/index.php  ->  "logdev"
+    $script  = $_SERVER['SCRIPT_NAME'] ?? '/logg/public/index.php';
+    $folder  = (strpos($script, '/logdev/') !== false) ? 'logdev' : 'logg';
+    define('LOGG_FOLDER', $folder);
+    define('LOGG_BASE_URL', $scheme . '://' . $host . '/' . $folder . '/public');
+}
 ?>

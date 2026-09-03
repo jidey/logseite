@@ -529,6 +529,19 @@ function updateResultDisplay(autoID, isChecked) {
         // Coché : afficher Passed
         resultCell.innerHTML = '<span class="result-badge result-passed">✅ Passed</span>';
         updateCounters(dPassed, dFlaky, dFailed);
+
+        // In "Failed Only" view, a validated scenario counts as Passed and no
+        // longer belongs in the list: hide its row instantly (no refresh needed).
+        // The filter can be active via the URL (OnlyFailed=1) or via the
+        // restored radio button, so we read the button's current state.
+        const failedOnlyBtn = document.getElementById('onlyFailedBtn');
+        const isFailedOnly = (typeof LOGG_ONLY_FAILED !== 'undefined' && LOGG_ONLY_FAILED)
+                             || (failedOnlyBtn && failedOnlyBtn.checked);
+        if (isFailedOnly) {
+            row.style.transition = 'opacity 0.3s ease';
+            row.style.opacity = '0';
+            setTimeout(function() { row.remove(); }, 300);
+        }
     } else {
         // Décoché : restaurer le statut d'origine + inverser les deltas
         if (origin === 'Failed') {
@@ -620,7 +633,6 @@ function updateTestSetStats() {
         return;
     }
     
-    const statusPassed = testsetInfo.querySelector('span.status-passed');
     const statusFlaky = testsetInfo.querySelector('span.status-flaky');
     const statusFailed = testsetInfo.querySelector('span.status-failed');
     
@@ -630,25 +642,23 @@ function updateTestSetStats() {
     }
     
     // Extraire les valeurs actuelles
-    const passedText = statusPassed ? statusPassed.textContent.trim() : '0';
     const flakyText = statusFlaky.textContent.trim();
     const failedText = statusFailed.textContent.trim();
     
-    let passed = parseInt(passedText.replace(/\D/g, '')) || 0;
     let flaky = parseInt(flakyText.replace(/\D/g, '')) || 0;
     let failed = parseInt(failedText.replace(/\D/g, '')) || 0;
     
-    //console.log('📈 Valeurs actuelles affichées:', { passed, flaky, failed });
+    //console.log('📈 Valeurs actuelles affichées:', { flaky, failed });
     //console.log('📡 Saving stats to database for AutoID:', autoID);
     
-    // Envoyer Passed, Flaky et Failed
+    // Envoyer seulement Flaky et Failed
+    // PHP calculera Passed = TotalCount - Flaky - Failed
     fetch('update_testset_stats.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: `AutoID=${encodeURIComponent(autoID)}` +
-      `&Passed=${encodeURIComponent(passed)}` +
       `&Flaky=${encodeURIComponent(flaky)}` +
       `&Failed=${encodeURIComponent(failed)}` +
       `&TestType=${encodeURIComponent(testType)}` +

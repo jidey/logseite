@@ -166,7 +166,7 @@
 
 	function getBranchVersion($tag){
 		// Construct the full path to the file
-		$filePath = "deployedVM/last" . $tag . "Deploy.txt";
+		$filePath = SHARED_DATA_DIR . "deployedVM/last" . $tag . "Deploy.txt";
 		// Check if the file exists
 		if (file_exists($filePath)) {
 			// Read the content of the file
@@ -252,7 +252,7 @@
 			$total = $passed + $failed;
 			$failedPercentage = round($failed / $total * 100, 0);
 
-			$runn="https://sqs-sel-cent1.cas-software.dev/logg/public/dailyStats.php?passed=".$passed."&failed=".$failed."&percent=".$failedPercentage."&Branch=".urlencode($Branch)."&table=".$table."_daily";
+			$runn= LOGG_BASE_URL . "/dailyStats.php?passed=".$passed."&failed=".$failed."&percent=".$failedPercentage."&Branch=".urlencode($Branch)."&table=".$table."_daily";
 			$streamContext = stream_context_create([
 				'ssl' => [
 				'verify_peer'      => false,
@@ -372,13 +372,13 @@
 		🌙 Dark
 	</button>
 	<center>
-	<br><a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php"><< UI-TESTS STATUS Summary</a><br><br>
+	<br><a href="<?php echo LOGG_BASE_URL; ?>/index.php"><< UI-TESTS STATUS Summary</a><br><br>
 	</center>
     <table class="tg">
 		<thead>
 		  <tr >
 			<?php
-			echo "<th class=\"tg-simple1\"><a href=\"https://sqs-sel-cent1.cas-software.dev/logg/public/dash.php?refresh=true\" style=\"display:block;\"><img title=\"Refresh results\" src=\"icons\\refresh.png\"><br>Reload</a></th>";
+			echo "<th class=\"tg-simple1\"><a href=\"" . LOGG_BASE_URL . "/dash.php?refresh=true\" style=\"display:block;\"><img title=\"Refresh results\" src=\"icons\\refresh.png\"><br>Reload</a></th>";
 			echo "<th class=\"tg-simple\" colspan=\"3\"><img src=\"icons\\we.png\"></th>";
 			echo "<th class=\"tg-simple\" colspan=\"" . count($webBranches) . "\"><img src=\"icons\\sd.png\"></th>";
 			//echo "<th class=\"tg-simple\" colspan=\"4\"><img src=\"icons\\gW.png\"></th>";
@@ -427,12 +427,12 @@
 					if ($row == 3) {
 						//FAILED
 						echo "<td class=\"tg-casred\" rowspan='1' >Failed</td>";
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=" . urlencode($LOGG_SMARTWE_HF) . "&TestBrowser=chrome", $we_hf_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=" . urlencode($LOGG_SMARTWE_RC) . "&TestBrowser=chrome", $we_rc_failed);
-						generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=" . urlencode('dev_' . $SMARTWE_CURRENT_VERSION) . "&TestBrowser=chrome", $we_dev_failed);
+						generateResultCell(LOGG_BASE_URL . "/index.php?Product=weWebSel&Testtype=" . urlencode($LOGG_SMARTWE_HF) . "&TestBrowser=chrome", $we_hf_failed);
+						generateResultCell(LOGG_BASE_URL . "/index.php?Product=weWebSel&Testtype=" . urlencode($LOGG_SMARTWE_RC) . "&TestBrowser=chrome", $we_rc_failed);
+						generateResultCell(LOGG_BASE_URL . "/index.php?Product=weWebSel&Testtype=" . urlencode('dev_' . $SMARTWE_CURRENT_VERSION) . "&TestBrowser=chrome", $we_dev_failed);
 						foreach ($webBranches as $wb) {
 							$failed = $webResults[$wb['testType']][1] ?? '';
-							generateResultCell("https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=gWWebSel&Testtype=" . urlencode($wb['testType']) . "&TestBrowser=chrome", $failed);
+							generateResultCell(LOGG_BASE_URL . "/index.php?Product=gWWebSel&Testtype=" . urlencode($wb['testType']) . "&TestBrowser=chrome", $failed);
 						}
 					}
 				echo '</tr>';

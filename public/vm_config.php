@@ -2,6 +2,7 @@
 // Central configuration file for versions/branches (no need for the
 // DB connection here, so only versions_config.php is loaded)
 require_once __DIR__ . '/../config/versions_config.php';
+require_once __DIR__ . '/../config/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,7 +87,7 @@ require_once __DIR__ . '/../config/versions_config.php';
           <table class="table table-bordered table-striped align-middle text-center">
             <thead class="table-light">
               <tr>
-                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php" target="_blank">Logs</a>)</th>
+				<th>Branch (<a href="<?php echo LOGG_BASE_URL; ?>/index.php" target="_blank">Logs</a>)</th>
                 <?php
                 foreach ($branches as $branch) {
 				$url = "https://sqs-sel-$branch.cas-software.dev/smartdesign/";
@@ -150,7 +151,7 @@ require_once __DIR__ . '/../config/versions_config.php';
           <table class="table table-bordered table-striped align-middle text-center">
             <thead class="table-light">
               <tr>
-                <th>Branch (<a href="https://sqs-sel-cent1.cas-software.dev/logg/public/index.php?Product=weWebSel&Testtype=rc_x18" target="_blank">Logs</a>)</th>
+                <th>Branch (<a href="<?php echo LOGG_BASE_URL; ?>/index.php?Product=weWebSel&Testtype=rc_x18" target="_blank">Logs</a>)</th>
                 <?php
                 foreach ($branches as $branch) {
 					if ($branch === 'wehf') {
@@ -309,7 +310,7 @@ function renderLastBuildRowWe($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
 	$suffixshort = substr($suffix, 2);
-	$file = "builds/{$prefix}{$suffixshort}Build.txt";
+	$file = SHARED_DATA_DIR . "builds/{$prefix}{$suffixshort}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -319,7 +320,7 @@ function renderLastBuildRowWe($prefix, $suffixes) {
 function renderLastBuildRow($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
-	$file = "builds/{$prefix}{$suffix}Build.txt";
+	$file = SHARED_DATA_DIR . "builds/{$prefix}{$suffix}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -330,7 +331,7 @@ function renderLastBuildRowTC($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
 	$clean = explode('_', $suffix)[0];
-    $file = "builds/{$prefix}{$clean}Build.txt";
+    $file = SHARED_DATA_DIR . "builds/{$prefix}{$clean}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -360,8 +361,8 @@ function renderDeploymentRowWithComparison($buildPrefix, $deployPrefix, $branche
 	$branch = $branches[$i];
 	$suffix = $suffixes[$i];
 
-	$buildFile = "builds/{$buildPrefix}{$branch}Build.txt";
-	$deployFile = "deployedVM/{$deployPrefix}{$suffix}.txt";
+	$buildFile = SHARED_DATA_DIR . "builds/{$buildPrefix}{$branch}Build.txt";
+	$deployFile = SHARED_DATA_DIR . "deployedVM/{$deployPrefix}{$suffix}.txt";
 
 	$buildValue = file_exists($buildFile) ? trim(file_get_contents($buildFile)) : "N/A";
 	$deployValue = file_exists($deployFile) ? trim(file_get_contents($deployFile)) : "N/A";
@@ -384,8 +385,8 @@ function renderDeploymentRowWithComparisonTC($buildPrefix, $deployPrefix, $branc
 	$cleanbranch = explode('_', $branch)[0];
 	$suffix = $suffixes[$i];
 	
-	$buildFile = "builds/{$buildPrefix}{$cleanbranch}Build.txt";
-	$deployFile = "deployedVM/{$deployPrefix}{$suffix}.txt";
+	$buildFile = SHARED_DATA_DIR . "builds/{$buildPrefix}{$cleanbranch}Build.txt";
+	$deployFile = SHARED_DATA_DIR . "deployedVM/{$deployPrefix}{$suffix}.txt";
 
 	$buildValue = file_exists($buildFile) ? trim(file_get_contents($buildFile)) : "N/A";
 	$deployValue = file_exists($deployFile) ? trim(file_get_contents($deployFile)) : "N/A";

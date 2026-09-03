@@ -231,7 +231,9 @@ $protocol://$host . dirname($_SERVER['PHP_SELF']) . "/check.php?value=2&autoid=.
 ```
 
 **SmartWe branch mapping for Jenkins (rerun.php ConfirmAndRun)**:
-- dev → `dev/14.x`, rc → `rc/13.x`, hf → `hotfix/13.x`
+- SmartWe is now **entirely on x18** (see §12.1): dev → `dev/14.x`,
+  rc → `rc/14.x`, hf → `hotfix/14.x`. The `$branchMap` in rerun.php maps
+  `rc_x18`/`hf_x18`/`dev_x18` (and `we_rc`/`we_hf`/`we_dev`) accordingly.
 
 ---
 
@@ -257,7 +259,7 @@ Shared files: `css/theme.css` + `js/theme.js`.
 
 | Key | Content |
 |-----|---------|
-| `logg-prefs` | JSON: {theme, text_size, error_only, product, testtype, test_browser, team_tag} |
+| `logg-prefs` | JSON: {theme, text_size, error_only, product, testtype, test_browser, team_tag, db_server} |
 | `logg-theme` | 'dark' / 'light' |
 | `logg-error-only` | '0' / '1' |
 | `logg-sort` | JSON: {column, order} |
@@ -337,6 +339,9 @@ Shared files: `css/theme.css` + `js/theme.js`.
 - JD works with **complete files** (not partial snippets) — return the
   whole modified file
 - Conversations are sometimes in **French**
+- **Code comments must always be in English**, even when the conversation
+  itself is in French (noted 09/01/2026) — applies to all files, including
+  `config/versions_config.php` (already translated) and any future edit
 - Output files in `/outputs/public/` (project structure), sometimes
   mirrored at the `/outputs/` root too
 - Regenerate `styles.min.css` if `styles.css` changes; `app.min.js` if
@@ -380,3 +385,195 @@ Shared files: `css/theme.css` + `js/theme.js`.
    layout → use `error_log()` or return an empty value instead
 6. **setTimeout(savePreferences)** after submit: risk of navigating away
    before the save happens → save synchronously BEFORE submit
+
+---
+
+## 12. Session updates (Sept 2026)
+
+This section captures the work done in the long Sept-2026 session, on top of
+everything above. When something here contradicts an earlier section, **this
+section wins** (it is more recent).
+
+### 12.1 SmartWe fully migrated to x18 (RC and HF)
+
+SmartWe is now **entirely on x18**. Both RC and HF were moved:
+- `rc` → **`rc_x18`** (was rc_x17)
+- `hf` → **`hf_x18`** (was hf_x17 — HF was the last one still on x17)
+- `dev` → `dev_x18`
+
+Nothing is on x17 for SmartWe anymore. This is driven by
+`$SMARTWE_CURRENT_VERSION = 'x18'` in `config/versions_config.php`, which
+computes `$LOGG_SMARTWE_HF = 'hf_x18'` and `$LOGG_SMARTWE_RC = 'rc_x18'`.
+
+**Files using these vars** (normalization `if ($isSmartWe) { hf→$LOGG_SMARTWE_HF;
+rc→$LOGG_SMARTWE_RC }`): `index.php`, `details.php`, `sync_main.php`. The
+`$smartWeMapping` in index.php sets `['hf']='hf_x18'`, `['rc']='rc_x18'`,
+`['feature']='we_feat'`. `dash.php` SmartWe links use `hf_x18`/`rc_x18`/`dev_x18`.
+
+Table resolution is unchanged (SmartWe always → `we_hf`/`we_rc`/`we_dev`),
+confirmed present in both `TestLogRepository` fallback map and `check.php`
+`$tableMap` for `hf_x18`/`rc_x18`. Endpoints (`check.php`,
+`update_validation.php`, `update_testset_stats.php`, `stats.php`) resolve by
+`stripos(..., 'hf'/'rc')` → version-independent, no change needed.
+
+Jenkins Git branches for SmartWe (confirmed by JD): rc → `rc/14.x`,
+hf → `hotfix/14.x`, dev → `dev/14.x`. **⚠️ Jenkins pipeline gotcha**: the
+`putEnvVars()` smartWE section in `webTests.groovy` had `rc/13.x` hardcoded
+while Setup Runner expected `rc/14.x` → `env.TEST_URL` was null → empty test
+run + empty Allure report. Fixed to `rc/14.x`.
+
+### 12.2 hf_x18 (gW Web) treated as a normal branch
+
+`hf_x18` for gW Web is no longer forced into parentheses "(hf_x18)".
+`$LOGG_FUTURE_TESTTYPES` (from versions_config, the `future`-status list)
+now drives the parentheses in the selector; hf_x18 has status `active` so it
+shows normally. Requires table `x18_hf` to exist + cache clear.
+
+### 12.3 DBServer (SQL / PGS) — new dimension everywhere
+
+Tests can now run against two DB backends: **SQL** or **PGS**. Added across
+the stack:
+- **rerun.php**: `$DBServer = $_GET['DBServer'] ?? 'SQL'`; a `<select>` (SQL/PGS)
+  in the confirmation form; `ConfirmAndRun($...,$DBServer,...)` appends
+  `&DBServer=` to the Jenkins URL (was previously hardcoded "SQL" — fixed to
+  use the passed value).
+- **DB column**: a `DBServer VARCHAR(10) NOT NULL DEFAULT 'SQL'` column must
+  exist on every log table (ALTER TABLE per table). Empty value → treated as
+  'SQL' by default in the UI.
+- **post.php**: must read `DBServer` from GET and INSERT it (default 'SQL').
+  ⚠️ For the value to actually vary, the **Selenium/Java runner
+  (`LogExportUtil.java`) must forward the `DBServer` param it receives from
+  Jenkins** to its post.php call — otherwise the column stays 'SQL'.
+- **index.php**: a "DB Server" filter (`All`/SQL/PGS) in `class="filters"`,
+  applied in the `array_filter`, persisted in `logg-prefs.db_server`, and
+  wired into the early-redirect + auto-submit list. A **"DB" column** in the
+  results table (shows the run's DBServer, default 'SQL'). Column count went
+  to 12 → all `colspan` updated to 12.
+- **details.php**: same "DB" column in the scenarios table.
+
+### 12.4 "Run All Failed" — batch mode with a single parameter form
+
+Rewritten from the old fire-and-forget fetch. Now:
+- **details.php** button navigates to `rerun.php` in **batch mode**, passing
+  `&TCProjList=<tcproj1>|||<tcproj2>|||...` **and**
+  `&AutoIDList=<id1>|||<id2>|||...` (aligned by index, plain `explode` on
+  both sides — no `array_filter`, to keep indexes in sync). Also passes the
+  TestSet Main `AutoID` and the deployed `Build`.
+- **rerun.php** detects `$isBatch = !empty($TCProjList)`, shows the normal
+  parameter form **once** (node, localrun, retry, **DBServer**), and on
+  Confirm loops over every TCProj: rebuilds the Jenkins URL per scenario AND
+  **rebuilds the check.php URL per scenario with its own AutoID**
+  (`$runnOne`), so each failed scenario gets `running=2` individually.
+  `ConfirmAndRun(..., $doRedirect=false)` for all but the redirect at the end.
+- **Hidden fields** `TCProjList` and `AutoIDList` must be in the form so they
+  survive the Confirm submit.
+- **Validated scenarios are excluded** from both the "Failed Only" filter and
+  the "Run All Failed" collection (`if (!empty($sc['checked'])) continue;`).
+
+### 12.5 rerun.php DryRun debug mode
+
+`&DryRun=1` (with `&Confirm=1`) makes `ConfirmAndRun` **display** the check.php
+and Jenkins URLs instead of sending them (nothing executed). Works for single
+and batch (one debug block per scenario). Invaluable for diagnosing what
+actually goes to Jenkins. Signature: `ConfirmAndRun(..., $doRedirect=true,
+$dryRun=false)`.
+
+### 12.6 rerun.php — sendGetRequest MUST be file-scope (recurring bug)
+
+`sendGetRequest()` must be declared **at file scope**, NOT inside
+`ConfirmAndRun()`. In batch mode `ConfirmAndRun` is called multiple times; if
+`sendGetRequest` is nested, PHP throws **"Fatal error: Cannot redeclare
+sendGetRequest()"** on the 2nd call. This bug reappeared several times after
+re-uploading older rerun.php versions — always check it. General rule: never
+declare a function inside another function that can be called in a loop.
+
+### 12.7 Feature branches (web_feat / we_feat) — grouped by JJob
+
+When `$testType === 'we_feat'` or `'web_feat'` (`$isFeature`), index.php:
+- resolves the table via a short-circuit in
+  `TestLogRepository::getTableForTestType()`: `if ($testType==='we_feat' ||
+  $testType==='web_feat') return $testType;` (the testType IS the table name).
+- sorts TestSets by JJob then date desc, and inserts a
+  `<tr class="job-group-header"><td colspan="12">📁 JJob</td></tr>` on each
+  JJob change (like stats.php).
+- `$isFeature` is declared **before** the try block (avoids undefined-var
+  warning if no jobs).
+- ⚠️ TODO: the JS column sort (`sortTable` in app.js) will scramble the group
+  header rows if the user clicks a sortable header in feature mode — consider
+  dropping the `sortable` class when `$isFeature`.
+- `web_feat` added to the gW Web branch list in index.php; `we_feat` added to
+  `$smartWeMapping['feature']`.
+- Feature runs are posted by the runner with `Testtype='web_feat'`/`'we_feat'`
+  and `Product='gWWebSel'`/`'weWebSel'` respectively.
+
+### 12.8 "Validated" hides the row instantly in "Failed Only"
+
+When "Failed Only" is active and a scenario is validated (checkbox checked),
+its row now fades out and is removed immediately (no refresh). **Key gotcha**:
+there are **two** `updateScenarioValidation` definitions — one inline in
+details.php and one in **`app.js`** (which calls `updateResultDisplay`).
+Because app.js loads with `defer`, **app.js wins**. So the row-hiding logic
+had to go into `updateResultDisplay` in **app.js**, not into details.php's
+inline version. The masking reads either `LOGG_ONLY_FAILED` (a JS const set
+from PHP `$onlyFailed`) OR the `#onlyFailedBtn` radio state, so it works
+whether the filter came from the URL or from localStorage.
+
+**General reminder** (extends §9): `app.js` loads last (`defer`) and its
+function definitions OVERRIDE the inline ones in details.php. Fixes to shared
+functions (`updateScenarioValidation`, `updateResultDisplay`, `updateCounters`,
+`updateTestSetStats`) must go in **app.js**, not the inline `<script>`.
+
+### 12.9 dev/prod folder switch: logg vs logdev (LOGG_BASE_URL)
+
+A "dev" branch is served from **`logdev/public`** instead of `logg/public`.
+To avoid hardcoding the folder in absolute URLs, add to `config/config.php`:
+
+```php
+if (!defined('LOGG_BASE_URL')) {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'sqs-sel-cent1.cas-software.dev';
+    $script = $_SERVER['SCRIPT_NAME'] ?? '/logg/public/index.php';
+    $folder = (strpos($script, '/logdev/') !== false) ? 'logdev' : 'logg';
+    define('LOGG_FOLDER', $folder);
+    define('LOGG_BASE_URL', $scheme . '://' . $host . '/' . $folder . '/public');
+}
+```
+
+Then replace hardcoded `https://.../logg/public` with `LOGG_BASE_URL` (26
+occurrences across index/details/rerun/dash/vm_config; comments in
+clear_cache/stats can stay). In `echo "..."` use `. LOGG_BASE_URL .`; in HTML
+use `<?php echo LOGG_BASE_URL; ?>`. **Leave `$basePath =
+dirname($_SERVER['PHP_SELF'])` in rerun.php as-is** — it's already
+folder-adaptive. **⚠️ Jenkins/Java side is separate**: the dev pipeline must
+point its post.php/check.php calls to `logdev/public` itself — `LOGG_BASE_URL`
+only affects in-site navigation, not what Jenkins calls.
+
+### 12.10 French → English comment translation
+
+All code comments across the project were translated FR → EN (per §9). Only
+comments changed; functional code and **user-facing / JSON message strings**
+(e.g. flaky.php JSON responses, app.js alerts) were intentionally left as-is.
+`.min.css` / `.min.js` untouched (regenerate from source after edits).
+
+### 12.11 Open items from this session
+
+- [ ] **"Running" state not updating in batch** — root-caused via DryRun: the
+      old rerun.php sent `autoid=` empty to check.php. Fixed (§12.4) by adding
+      `AutoIDList` + per-scenario `$runnOne`. DryRun confirmed correct
+      `autoid=NNNN` per scenario. **To verify without DryRun**: run a real
+      "Run All Failed" and confirm the scenarios show "Running" in details.
+      (Possible secondary risk: 14 sequential cURL calls for a big batch may
+      hit PHP `max_execution_time` — if only the first few get "Running",
+      decouple the check.php calls (fast) from the Jenkins calls, or mark
+      running via direct SQL first.)
+- [ ] **`@nightly` run logs too many tests** — DryRun proved rerun.php sends
+      the CORRECT `TestName=@dummy&Testset=@nightly` to Jenkins. So the
+      over-logging is in the **Jenkins pipeline** (`webTests.groovy`
+      `Setup Runner` stage): the `switch(testset)` case `@nightly` does
+      `replaceAll("and not @nightly","and @nightly")` on `JRunner.java`. Likely
+      the source text of JRunner.java changed and the replaceAll no longer
+      matches (silent no-op → filter not applied). Next step: rerun with
+      `DetailedLog=true`, read the printed `########## JRUNNER ###########`
+      block, check whether the final tag expression contains `and @nightly`.
+- [ ] Consider unifying the duplicated JS (details.php inline vs app.js) — see
+      §12.8. Fragile: every change must be made in both places.
