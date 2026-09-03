@@ -182,7 +182,7 @@ if ($execute) {
 				ConfirmAndRun($testOne, $runnOne, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
 							 $localrun, $parallel, $Build, $retry, $DBServer, false, $dryRun); // false = don't redirect yet
 			}
-			//header("Location: " . $logurl);
+			header("Location: " . $logurl);
 			exit;
 		} else {
 		    ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,

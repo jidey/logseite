@@ -27,7 +27,7 @@ function getDeployedBuild($testType, $product) {
         if (count($parts) == 2) {
             $branch = $parts[0]; // dev, rc, hf
             $suffix = "we" . strtolower($branch); // wedev, werc, wehf
-            $deployFile = SHARED_DATA_DIR . "deployedVM/lastWe{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "_deployedVM/lastWe{$suffix}Deploy.txt";
         }
     } else {
         // gWWebSel: testtype format is "rc_x17", "dev_x17", "hf_x17"
@@ -37,7 +37,7 @@ function getDeployedBuild($testType, $product) {
             $branch = $parts[0];
             $version = str_replace("x", "", $parts[1]);
             $suffix = $branch . $version;
-            $deployFile = SHARED_DATA_DIR . "/deployedVM/lastSel{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "_deployedVM/lastSel{$suffix}Deploy.txt";
         }
     }
 
