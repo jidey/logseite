@@ -28,7 +28,7 @@ function respond($success, $message, $extra = []) {
 }
 
 try {
-    require_once __DIR__ . '/../config/config.php';
+    require_once __DIR__ . '/../../_config/config.php';
 } catch (Throwable $e) {
     respond(false, 'Config error: ' . $e->getMessage());
 }
@@ -44,7 +44,7 @@ $Product    = isset($_GET['Product'])    ? $_GET['Product']         : "";
 $field      = isset($_GET['field'])      ? $_GET['field']           : "";
 
 // Table mapping (Testtype + Product -> table)
-// Centralized in config/versions_config.php ($product_table_map, loaded via config.php)
+// Centralized in _config/versions_config.php ($product_table_map, loaded via config.php)
 $tableMap = $product_table_map ?? [];
 
 // Determine the table name

@@ -144,7 +144,7 @@ $stats = $repo->getCacheStats(); // Retourne : array
 ### Exemple : Voir les stats du cache
 
 ```php
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 $repo = new TestLogRepository($pdo);

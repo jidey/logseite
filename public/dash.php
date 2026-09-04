@@ -73,7 +73,7 @@
 
 <tbody>
 	<?php
-	require_once __DIR__ . '/../config/config.php';
+	require_once __DIR__ . '/../../_config/config.php';
 
 	if (isset($_GET['refresh']))
 	{$refresh = $_GET['refresh'];}
@@ -280,7 +280,7 @@
 
 	// --------------------------------------------------------------------
 	// gW Web (the "sd.png" columns): built dynamically from
-	// config/versions_config.php. Column order: HF, RC, DEV, grouped by
+	// _config/versions_config.php. Column order: HF, RC, DEV, grouped by
 	// increasing version (x16, x17, x18, x19...) — same as the historical
 	// order. Adding a version to $LOGG_VERSIONS (versions_config.php) is
 	// enough: it shows up here automatically, no need to touch dash.php.

@@ -7,7 +7,7 @@
  */
 
 // Load configuration and Repository
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 /**
@@ -69,9 +69,9 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see _config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see _config/versions_config.php)
     }
 }
 

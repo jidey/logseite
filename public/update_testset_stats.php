@@ -5,7 +5,7 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 try {
-    require_once __DIR__ . '/../config/config.php';
+    require_once __DIR__ . '/../../_config/config.php';
 
     $autoID   = $_POST['AutoID'] ?? null;
     $passed   = isset($_POST['Passed']) ? intval($_POST['Passed']) : null;
@@ -30,7 +30,7 @@ try {
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
-    // Centralized mapping in config/versions_config.php (loaded via config.php)
+    // Centralized mapping in _config/versions_config.php (loaded via config.php)
     if ($isSmartWe) {
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';
         elseif (stripos($testType, 'rc') !== false)  $tableName = 'we_rc';

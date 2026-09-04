@@ -8,7 +8,7 @@
  */
 
 // Load configuration and Repository
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 /**
@@ -98,9 +98,9 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see _config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see _config/versions_config.php)
     }
 }
 
@@ -287,14 +287,14 @@ $testTypesForProduct = $repo->getAvailableTestTypesForProduct($product);
 $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
 // For gW Desktop, force the specific branch list
-// (centralized list in config/versions_config.php: $LOGG_GW_DESKTOP_LIST)
+// (centralized list in _config/versions_config.php: $LOGG_GW_DESKTOP_LIST)
 if ($isGwDesktop) {
     // Display all these branches, whether they have data or not
     $testTypesForProduct = $LOGG_GW_DESKTOP_LIST;
 } else {
     // For the other products (gW Web, etc.), obsolete branches are already
     // excluded upstream: TestLogRepository only returns branches whose
-    // status is not 'retired' in config/versions_config.php.
+    // status is not 'retired' in _config/versions_config.php.
 
     // Add the feature branch (gW Web) if missing
     if (!$isSmartWe && !in_array('web_feat', $testTypesForProduct)) {
@@ -512,7 +512,7 @@ if (empty($testTypesForProduct)) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php
-                                // Branches marked 'future' in config/versions_config.php
+                                // Branches marked 'future' in _config/versions_config.php
                                 // -> displayed in parentheses (not yet available)
                                 $notYetAvailable = $LOGG_FUTURE_TESTTYPES;
                                 foreach ($testTypesForProduct as $v):

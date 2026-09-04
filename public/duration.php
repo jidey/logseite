@@ -3,7 +3,7 @@
 <body>
 	<?php
 	try {
-		require_once __DIR__ . '/../config/config.php';
+		require_once __DIR__ . '/../../_config/config.php';
 	} catch (Throwable $e) {
 		respond(false, 'Config error: ' . $e->getMessage());
 	}

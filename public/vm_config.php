@@ -1,8 +1,8 @@
 <?php
 // Central configuration file for versions/branches (no need for the
 // DB connection here, so only versions_config.php is loaded)
-require_once __DIR__ . '/../config/versions_config.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../_config/versions_config.php';
+require_once __DIR__ . '/../../_config/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,7 +77,7 @@ require_once __DIR__ . '/../config/config.php';
       <!-- VMs Tab -->
       <div class="tab-pane fade show active" id="selenium" role="tabpanel" aria-labelledby="selenium-tab">
         <?php
-          // Derived from config/versions_config.php ($LOGG_VM_BRANCHES): adding
+          // Derived from _config/versions_config.php ($LOGG_VM_BRANCHES): adding
           // a gW Web version in that file is enough to add it here too.
           $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
           $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);
@@ -112,7 +112,7 @@ require_once __DIR__ . '/../config/config.php';
       <!-- Release VMs Tab -->
       <div class="tab-pane fade" id="release" role="tabpanel" aria-labelledby="release-tab">
 	    <?php
-          // Derived from config/versions_config.php ($LOGG_VM_BRANCHES): adding
+          // Derived from _config/versions_config.php ($LOGG_VM_BRANCHES): adding
           // a gW Web version in that file is enough to add it here too.
           $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
           $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);

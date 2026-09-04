@@ -7,7 +7,7 @@
 
 // Central configuration file for versions/branches (no need for the
 // DB connection here, so only versions_config.php is loaded)
-require_once __DIR__ . '/../config/versions_config.php';
+require_once __DIR__ . '/../../_config/versions_config.php';
 
 // Read the GET parameters
 $logurl = $_GET['url'] ?? "https://sqs-sel-cent1.cas-software.dev/logg/public/index.php";
@@ -648,7 +648,7 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     $Test_y = "&Test_Node=" . $Test_x;
 
     // Map the branches (testType -> Jenkins Git branch)
-    // Centralized mapping in config/versions_config.php ($LOGG_JENKINS_BRANCH_MAP)
+    // Centralized mapping in _config/versions_config.php ($LOGG_JENKINS_BRANCH_MAP)
     global $LOGG_JENKINS_BRANCH_MAP;
     $branch = $LOGG_JENKINS_BRANCH_MAP[$branch] ?? $branch;
     

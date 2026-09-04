@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../_config/config.php';
 
 $directory = SHARED_DATA_DIR . "_deployedVM";
 $files = scandir($directory);
