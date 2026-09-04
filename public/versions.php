@@ -1,6 +1,7 @@
 <?php
+require_once __DIR__ . '/../../_config/config.php';
 
-$directory = SHARED_DATA_DIR . "deployedVM";
+$directory = SHARED_DATA_DIR . "_deployedVM";
 $files = scandir($directory);
 $results = [];
 
@@ -39,7 +40,7 @@ foreach ($files as $file) {
 }
 
 // Write the results to a JSON file
-$jsonFilePath = 'builds_versions.json';
+$jsonFilePath = SHARED_DATA_DIR . '_builds/builds_versions.json';
 file_put_contents($jsonFilePath, json_encode($results, JSON_PRETTY_PRINT));
 
 ?>

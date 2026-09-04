@@ -19,7 +19,7 @@
   </head>
   <body>
 	<?php
-	require_once '../config/config.php';
+	require_once '../../_config/config.php';
 
 	if (isset($_GET['JJob']))
 	{$JJob = $_GET['JJob'];}

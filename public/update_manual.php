@@ -10,7 +10,7 @@
  * - Product: Product (gWWebSel, etc.)
  */
 
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 header('Content-Type: application/json');

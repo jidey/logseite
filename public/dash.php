@@ -73,7 +73,7 @@
 
 <tbody>
 	<?php
-	require_once __DIR__ . '/../config/config.php';
+	require_once __DIR__ . '/../../_config/config.php';
 
 	if (isset($_GET['refresh']))
 	{$refresh = $_GET['refresh'];}
@@ -166,7 +166,7 @@
 
 	function getBranchVersion($tag){
 		// Construct the full path to the file
-		$filePath = SHARED_DATA_DIR . "deployedVM/last" . $tag . "Deploy.txt";
+		$filePath = SHARED_DATA_DIR . "_deployedVM/last" . $tag . "Deploy.txt";
 		// Check if the file exists
 		if (file_exists($filePath)) {
 			// Read the content of the file
@@ -280,7 +280,7 @@
 
 	// --------------------------------------------------------------------
 	// gW Web (the "sd.png" columns): built dynamically from
-	// config/versions_config.php. Column order: HF, RC, DEV, grouped by
+	// _config/versions_config.php. Column order: HF, RC, DEV, grouped by
 	// increasing version (x16, x17, x18, x19...) — same as the historical
 	// order. Adding a version to $LOGG_VERSIONS (versions_config.php) is
 	// enough: it shows up here automatically, no need to touch dash.php.
@@ -321,7 +321,7 @@
 			$webPartsFull = logg_branch_vm_parts($webTestType);
 
 			// Same tag convention as the old hardcoded code: "Sel" + branch + number
-			// (e.g. "Selhf17" -> deployedVM/lastSelhf17Deploy.txt)
+			// (e.g. "Selhf17" -> /_deployedVM/lastSelhf17Deploy.txt)
 			$webRawVersion = getBranchVersion('Sel' . $webBranch . $webPartsFull['num']);
 			$webPrefix = $LOGG_VERSION_LABEL_PREFIX[$webVersion] ?? null;
 			$webLabel = $webPrefix ? str_replace($webPrefix, $webVersion . '.', $webRawVersion) : $webRawVersion;

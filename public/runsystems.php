@@ -12,7 +12,7 @@
 
     // Dynamically generates the "Jenkins Node" field for any
     // version (no need to add a block here when a new gW Web/Desktop
-    // version is created in config/versions_config.php).
+    // version is created in _config/versions_config.php).
     if ($versionNumber === "we") {
         $selectName = "Test_Node";
         // smartWe: legacy submenu (behavior unchanged)

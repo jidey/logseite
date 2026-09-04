@@ -35,7 +35,7 @@
  * Version adapted for LOGG (PDO via config.php)
  */
 
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 
 // Get and clean the GET parameters
 $JJob         = $_GET['JJob'] ?? '';

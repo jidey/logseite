@@ -455,7 +455,7 @@ class TestLogRepository {
         // 'active'/'future' for this product is displayed directly, without
         // a counting query: no need to wait for data to exist in the database
         // for a newly added version to appear in the selector (see
-        // config/versions_config.php for each branch's status:
+        // _config/versions_config.php for each branch's status:
         // 'active' | 'future' | 'retired').
         foreach ($this->product_table_map as $testType => $products) {
             if (isset($products[$product])) {

@@ -5,7 +5,7 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 try {
-    require_once __DIR__ . '/../config/config.php';
+    require_once __DIR__ . '/../../_config/config.php';
 
     $autoID   = $_POST['AutoID'] ?? null;
     $checked  = isset($_POST['Checked']) ? intval($_POST['Checked']) : 0;
@@ -25,7 +25,7 @@ try {
                   strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
-    // Centralized mapping in config/versions_config.php (loaded via config.php)
+    // Centralized mapping in _config/versions_config.php (loaded via config.php)
     if ($isSmartWe) {
         // SmartWe: we_* table depending on the branch, regardless of the x version
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';

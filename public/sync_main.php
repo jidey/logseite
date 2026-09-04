@@ -12,7 +12,7 @@
 
 header('Content-Type: application/json');
 
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 // --- Parameters ---
@@ -52,7 +52,7 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
               strpos($product, 'SmartWe')  !== false);
 
 // Normalize we_dev / we_rc / we_hf (SmartWe)
-// Current smartWe version centralized in config/versions_config.php
+// Current smartWe version centralized in _config/versions_config.php
 // ($SMARTWE_CURRENT_VERSION / $LOGG_SMARTWE_HF / $LOGG_SMARTWE_RC, e.g. x18 / hf_x18 / rc_x18)
 if ($isSmartWe) {
     if ($testType === 'we_dev')     $testType = 'dev_' . $SMARTWE_CURRENT_VERSION;

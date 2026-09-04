@@ -17,7 +17,7 @@
 	 * - History preserved: each distinct JParam = distinct execution
 	 */
 
-	require_once '../config/config.php';
+	require_once '../../_config/config.php';
 
 	// Helper: strip surrounding single quotes if present
 	function unquote($value) {
@@ -77,7 +77,7 @@
 	$LogLink = str_replace('Grid', 'Grid-x.7', $LogLink);
 
 	// For gWClient: resolve the table (LogVersion) from the Testtype
-	// Centralized mapping in config/versions_config.php ($LOGG_GWCLIENT_MAP)
+	// Centralized mapping in _config/versions_config.php ($LOGG_GWCLIENT_MAP)
 	if ($Product === 'gWClient') {
 		if (isset($LOGG_GWCLIENT_MAP[$Testtype])) {
 			$LogVersion = $LOGG_GWCLIENT_MAP[$Testtype];

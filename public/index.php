@@ -8,7 +8,7 @@
  */
 
 // Load configuration and Repository
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 /**
@@ -54,7 +54,7 @@ function getDeployedBuild($testType, $product) {
         if (count($parts) == 2) {
             $branch = $parts[0]; // dev, rc, hf
             $suffix = "we" . strtolower($branch); // wedev, werc, wehf
-            $deployFile = SHARED_DATA_DIR . "/deployedVM/lastWe{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "_deployedVM/lastWe{$suffix}Deploy.txt";
         }
     } else {
         // gWWebSel: testtype format is "rc_x17", "dev_x17", "hf_x17"
@@ -64,7 +64,7 @@ function getDeployedBuild($testType, $product) {
             $branch = $parts[0];
             $version = str_replace("x", "", $parts[1]);
             $suffix = $branch . $version;
-            $deployFile = SHARED_DATA_DIR . "/deployedVM/lastSel{$suffix}Deploy.txt";
+            $deployFile = SHARED_DATA_DIR . "_deployedVM/lastSel{$suffix}Deploy.txt";
         }
     }
     
@@ -98,9 +98,9 @@ $isSmartWe = (strpos($product, 'weWebSel') !== false ||
 
 if ($isSmartWe) {
     if (stripos($testType, 'hf') !== false) {
-        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_HF;  // e.g. hf_x18 (see _config/versions_config.php)
     } elseif (stripos($testType, 'rc') !== false) {
-        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see config/versions_config.php)
+        $testType = $LOGG_SMARTWE_RC;  // e.g. rc_x18 (see _config/versions_config.php)
     }
 }
 
@@ -287,14 +287,14 @@ $testTypesForProduct = $repo->getAvailableTestTypesForProduct($product);
 $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
 // For gW Desktop, force the specific branch list
-// (centralized list in config/versions_config.php: $LOGG_GW_DESKTOP_LIST)
+// (centralized list in _config/versions_config.php: $LOGG_GW_DESKTOP_LIST)
 if ($isGwDesktop) {
     // Display all these branches, whether they have data or not
     $testTypesForProduct = $LOGG_GW_DESKTOP_LIST;
 } else {
     // For the other products (gW Web, etc.), obsolete branches are already
     // excluded upstream: TestLogRepository only returns branches whose
-    // status is not 'retired' in config/versions_config.php.
+    // status is not 'retired' in _config/versions_config.php.
 
     // Add the feature branch (gW Web) if missing
     if (!$isSmartWe && !in_array('web_feat', $testTypesForProduct)) {
@@ -512,7 +512,7 @@ if (empty($testTypesForProduct)) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <?php
-                                // Branches marked 'future' in config/versions_config.php
+                                // Branches marked 'future' in _config/versions_config.php
                                 // -> displayed in parentheses (not yet available)
                                 $notYetAvailable = $LOGG_FUTURE_TESTTYPES;
                                 foreach ($testTypesForProduct as $v):

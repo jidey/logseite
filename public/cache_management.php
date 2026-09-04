@@ -5,7 +5,7 @@
  * URL: http://localhost/log/public/cache_management.php
  */
 
-require_once '../config/config.php';
+require_once '../../_config/config.php';
 require_once '../src/TestLogRepository.php';
 
 $repo = new TestLogRepository($pdo);

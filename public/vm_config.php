@@ -1,8 +1,8 @@
 <?php
 // Central configuration file for versions/branches (no need for the
 // DB connection here, so only versions_config.php is loaded)
-require_once __DIR__ . '/../config/versions_config.php';
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../_config/versions_config.php';
+require_once __DIR__ . '/../../_config/config.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,7 +77,7 @@ require_once __DIR__ . '/../config/config.php';
       <!-- VMs Tab -->
       <div class="tab-pane fade show active" id="selenium" role="tabpanel" aria-labelledby="selenium-tab">
         <?php
-          // Derived from config/versions_config.php ($LOGG_VM_BRANCHES): adding
+          // Derived from _config/versions_config.php ($LOGG_VM_BRANCHES): adding
           // a gW Web version in that file is enough to add it here too.
           $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
           $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);
@@ -112,7 +112,7 @@ require_once __DIR__ . '/../config/config.php';
       <!-- Release VMs Tab -->
       <div class="tab-pane fade" id="release" role="tabpanel" aria-labelledby="release-tab">
 	    <?php
-          // Derived from config/versions_config.php ($LOGG_VM_BRANCHES): adding
+          // Derived from _config/versions_config.php ($LOGG_VM_BRANCHES): adding
           // a gW Web version in that file is enough to add it here too.
           $branches = array_map(fn($tt) => logg_branch_vm_parts($tt)['display'], $LOGG_VM_BRANCHES);
           $suffixes = array_map(fn($tt) => logg_branch_vm_parts($tt)['suffix'], $LOGG_VM_BRANCHES);
@@ -310,7 +310,7 @@ function renderLastBuildRowWe($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
 	$suffixshort = substr($suffix, 2);
-	$file = SHARED_DATA_DIR . "builds/{$prefix}{$suffixshort}Build.txt";
+	$file = SHARED_DATA_DIR . "_builds/{$prefix}{$suffixshort}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -320,7 +320,7 @@ function renderLastBuildRowWe($prefix, $suffixes) {
 function renderLastBuildRow($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
-	$file = SHARED_DATA_DIR . "builds/{$prefix}{$suffix}Build.txt";
+	$file = SHARED_DATA_DIR . "_builds/{$prefix}{$suffix}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -331,7 +331,7 @@ function renderLastBuildRowTC($prefix, $suffixes) {
   echo "<tr><th>Last Build</th>";
   foreach ($suffixes as $suffix) {
 	$clean = explode('_', $suffix)[0];
-    $file = SHARED_DATA_DIR . "builds/{$prefix}{$clean}Build.txt";
+    $file = SHARED_DATA_DIR . "_builds/{$prefix}{$clean}Build.txt";
 	$content = file_exists($file) ? htmlspecialchars(file_get_contents($file)) : "N/A";
 	echo "<td>$content</td>";
   }
@@ -361,8 +361,8 @@ function renderDeploymentRowWithComparison($buildPrefix, $deployPrefix, $branche
 	$branch = $branches[$i];
 	$suffix = $suffixes[$i];
 
-	$buildFile = SHARED_DATA_DIR . "builds/{$buildPrefix}{$branch}Build.txt";
-	$deployFile = SHARED_DATA_DIR . "deployedVM/{$deployPrefix}{$suffix}.txt";
+	$buildFile = SHARED_DATA_DIR . "_builds/{$buildPrefix}{$branch}Build.txt";
+	$deployFile = SHARED_DATA_DIR . "_deployedVM/{$deployPrefix}{$suffix}.txt";
 
 	$buildValue = file_exists($buildFile) ? trim(file_get_contents($buildFile)) : "N/A";
 	$deployValue = file_exists($deployFile) ? trim(file_get_contents($deployFile)) : "N/A";
@@ -385,9 +385,9 @@ function renderDeploymentRowWithComparisonTC($buildPrefix, $deployPrefix, $branc
 	$cleanbranch = explode('_', $branch)[0];
 	$suffix = $suffixes[$i];
 	
-	$buildFile = SHARED_DATA_DIR . "builds/{$buildPrefix}{$cleanbranch}Build.txt";
-	$deployFile = SHARED_DATA_DIR . "deployedVM/{$deployPrefix}{$suffix}.txt";
-
+	$buildFile = SHARED_DATA_DIR . "_builds/{$buildPrefix}{$cleanbranch}Build.txt";
+	$deployFile = SHARED_DATA_DIR . "_deployedVM/{$deployPrefix}{$suffix}.txt";
+	
 	$buildValue = file_exists($buildFile) ? trim(file_get_contents($buildFile)) : "N/A";
 	$deployValue = file_exists($deployFile) ? trim(file_get_contents($deployFile)) : "N/A";
 

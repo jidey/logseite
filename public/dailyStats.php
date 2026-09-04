@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../../_config/config.php';
 
 $passed  = isset($_GET['passed'])  ? $_GET['passed']  : '';
 $failed  = isset($_GET['failed'])  ? $_GET['failed']  : '';
