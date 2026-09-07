@@ -1,6 +1,3 @@
-public/builds/
-public/deployedVM/
-public/nightly/
 public/deployedUrl.txt
 public/builds_versions.json
 .env
