@@ -15,6 +15,10 @@
 	 * - Single : UPDATE if JJob+JParam+Build+TCProj already exists (retry), INSERT otherwise
 	 * - Main   : DELETE restricted to Main + INSERT (Single history preserved)
 	 * - History preserved: each distinct JParam = distinct execution
+	 *
+	 * Running flag: once a new result has been stored, the previous runs of the
+	 * same TestSet / Scenario are reset (running = 0) so a row left in "Running"
+	 * state by a rerun does not stay stuck forever (see resetPreviousRunning()).
 	 */
 
 	require_once '../../_config/config.php';
@@ -28,6 +32,80 @@
 			$value = substr($value, 1, -1);
 		}
 		return $value;
+	}
+
+	/**
+	 * Reset the "running" flag on the PREVIOUS runs of the same test.
+	 *
+	 * Called right after a new result has been stored. Scope of the reset:
+	 *  - Main   : same TestSet name (TCProj) + same Jenkins job + same Browser
+	 *  - Single : same Scenario name (TCProj) + same Jenkins job + same Browser
+	 * Only older rows are touched (AutoID < the row just written), so the
+	 * current run is never affected.
+	 *
+	 * Fails silently (error_log only): a problem here must never break the
+	 * result storage nor pollute the response sent back to Jenkins.
+	 */
+	function resetPreviousRunning(PDO $pdo, $table, $testLogTyp, $tcproj, $jjob, $browser, $currentAutoID) {
+		if (!$currentAutoID) return 0;
+
+		try {
+			$stmt = $pdo->prepare(
+				"UPDATE `$table`
+				 SET `running` = 0
+				 WHERE TestLogTyp = :typ
+				   AND TCProj     = :tcproj
+				   AND JJob       = :jjob
+				   AND Browser    = :browser
+				   AND `running` <> 0
+				   AND AutoID     < :autoid"
+			);
+			$stmt->execute([
+				':typ'     => $testLogTyp,
+				':tcproj'  => $tcproj,
+				':jjob'    => $jjob,
+				':browser' => $browser,
+				':autoid'  => $currentAutoID,
+			]);
+			return $stmt->rowCount();
+		} catch (PDOException $e) {
+			error_log("post.php resetPreviousRunning error: " . $e->getMessage());
+			return 0;
+		}
+	}
+
+	/**
+	 * Reset the "running" flag on the scenarios (Single) of the PREVIOUS
+	 * executions of a TestSet.
+	 *
+	 * Called only when the Main row is stored (= end of the run), so scenarios
+	 * of the run currently in progress are never reset too early.
+	 * Previous executions are identified by the JJob+JParam pairs of the older
+	 * Main rows of the same TestSet; the current execution (:jparam) is excluded.
+	 *
+	 * Useful for a scenario left in "Running" state that was not part of the
+	 * new run (individual rerun that never posted a result, aborted job, ...).
+	 */
+	function resetPreviousScenariosRunning(PDO $pdo, $table, $tcproj, $jparam) {
+		try {
+			$stmt = $pdo->prepare(
+				"UPDATE `$table` AS s
+				 INNER JOIN (
+				     SELECT DISTINCT JJob, JParam
+				     FROM `$table`
+				     WHERE TestLogTyp = 'Main' AND TCProj = :tcproj
+				 ) AS m ON s.JJob = m.JJob AND s.JParam = m.JParam
+				 SET s.`running` = 0
+				 WHERE s.TestLogTyp = 'Single'
+				   AND s.`running` <> 0
+				   AND s.JParam <> :jparam"
+			);
+			$stmt->execute([':tcproj' => $tcproj, ':jparam' => $jparam]);
+			return $stmt->rowCount();
+		} catch (PDOException $e) {
+			error_log("post.php resetPreviousScenariosRunning error: " . $e->getMessage());
+			return 0;
+		}
 	}
 
 	// Read and clean GET parameters
@@ -116,6 +194,9 @@
 				':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 			]);
 
+			// New result stored -> the previous runs are no longer "Running"
+			resetPreviousRunning($pdo, $LogVersion, $TestLogTyp, $TCProj, $JJob, $Browser, $pdo->lastInsertId());
+
 		} elseif ($TestLogTyp === 'Single') {
 			// Individual scenario: UPDATE if same execution (retry), INSERT otherwise
 			// Uniqueness key: JJob + JParam + Build + TCProj
@@ -143,7 +224,8 @@
 					     TearDownPassed   = :passed,
 					     RunDate          = :rundate,
 					     RunDuration      = :runduration,
-					     LogLink          = :loglink
+					     LogLink          = :loglink,
+					     `running`        = 0
 					 WHERE AutoID = :autoid"
 				);
 				$updStmt->execute([
@@ -156,6 +238,9 @@
 					':loglink'     => $LogLink,
 					':autoid'      => $existing['AutoID'],
 				]);
+
+				// Retry finished -> older runs of this scenario are no longer "Running"
+				resetPreviousRunning($pdo, $LogVersion, 'Single', $TCProj, $JJob, $Browser, $existing['AutoID']);
 			} else {
 				// New run: normal INSERT
 				$stmt = $pdo->prepare(
@@ -179,6 +264,9 @@
 					':testtype'  => $Testtype,  ':browser'     => $Browser,
 					':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 				]);
+
+				// New scenario result -> older runs of this scenario are no longer "Running"
+				resetPreviousRunning($pdo, $LogVersion, 'Single', $TCProj, $JJob, $Browser, $pdo->lastInsertId());
 			}
 
 		} else {
@@ -211,6 +299,14 @@
 				':testtype'  => $Testtype,  ':browser'     => $Browser,
 				':tag' => $tag, ':teamtag' => $teamtag, ':dbserver' => $DBServer,
 			]);
+
+			// End of the run -> previous TestSet runs are no longer "Running"
+			resetPreviousRunning($pdo, $LogVersion, 'Main', $TCProj, $JJob, $Browser, $pdo->lastInsertId());
+
+			// ... and their scenarios left in "Running" state (aborted job,
+			// individual rerun that never posted a result, ...).
+			// Comment out this line to keep the reset strictly TestSet-level.
+			resetPreviousScenariosRunning($pdo, $LogVersion, $TCProj, $JParam);
 		}
 
 		// Success (silent)
