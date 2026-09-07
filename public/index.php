@@ -152,7 +152,8 @@ try {
                 $jobName,
                 $product,
                 $browser,
-                100  // Reduced from 500 for pagination
+                100,        // Reduced from 500 for pagination
+                $dbServer   // NEW: latest run *for this DB server*
             );
             
             if (!empty($runs)) {
@@ -170,7 +171,7 @@ try {
         }
         
         // Apply filters
-        $testsets = array_filter($testsets, function($testset) use ($testsetFilter, $teamTag, $errorOnly, $dbServer) { 	
+        $testsets = array_filter($testsets, function($testset) use ($testsetFilter, $teamTag, $errorOnly) { 	
             // Filter by TestSet name
             if (!empty($testsetFilter)) {
                 $jparam = $testset['JParam'] ?? '';
@@ -207,15 +208,6 @@ try {
                 }
             }
             
-            // Filter by DB server
-            if (!empty($dbServer)) {
-                $currentDb = trim($testset['DBServer'] ?? '');
-                if ($currentDb === '') $currentDb = 'SQL';  // Default
-                if ($currentDb !== $dbServer) {
-                    return false;
-                }
-            }
-			
             return true;
         });
         

@@ -139,7 +139,8 @@ class TestLogRepository {
         string $jobName,
         ?string $product = null,
         ?string $browser = null,
-        int $limit = 50
+        int $limit = 50,
+		?string $dbServer = null   // NEW: 'SQL' | 'PGS' | null = all DB servers
     ): array {
         try {
             $tableName = $this->getTableForTestType($testType, $product);
@@ -150,13 +151,23 @@ class TestLogRepository {
                 $dbTestType = $tableName;
             }
 
-            // This query retrieves the latest run for each unique parameter
+            // Normalized DBServer expression: empty/NULL is treated as 'SQL'
+            // (same default as post.php)
+            $dbExprL1 = "COALESCE(NULLIF(TRIM(l1.DBServer), ''), 'SQL')";
+            $dbExprL2 = "COALESCE(NULLIF(TRIM(l2.DBServer), ''), 'SQL')";
+
+            // When a DB server is selected, the "latest run" must be computed
+            // per DB server: otherwise a more recent run on the other server
+            // hides the last run of the requested one.
+            $dbJoin = !empty($dbServer) ? " AND $dbExprL1 = $dbExprL2" : "";
+
             $query = "SELECT l1.* FROM `$tableName` l1 
                       LEFT JOIN `$tableName` l2 
                       ON (l1.JParam = l2.JParam 
                           AND l1.JJob = l2.JJob 
                           AND l1.TestLogTyp = l2.TestLogTyp 
-                          AND l1.Testtype = l2.Testtype 
+                          AND l1.Testtype = l2.Testtype
+                          $dbJoin
                           AND l1.AutoID < l2.AutoID)
                       WHERE l1.JJob = :jjob
                       AND l1.Testtype = :testtype
@@ -178,6 +189,11 @@ class TestLogRepository {
                 $params[':browser'] = $browser;
             }
             
+			if (!empty($dbServer)) {
+                $query .= " AND $dbExprL1 = :dbserver";
+                $params[':dbserver'] = $dbServer;
+            }
+			
             $query .= " ORDER BY l1.RunDate DESC LIMIT :limit";
             
             $stmt = $this->pdo->prepare($query);

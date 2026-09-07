@@ -113,7 +113,7 @@ To stop `config.php`/`versions_config.php` from being duplicated (and risking dr
    define('SHARED_DATA_DIR', dirname(__DIR__) . DIRECTORY_SEPARATOR); // htdocs/_config -> htdocs/
    ```
 
-2. **Every `require_once __DIR__ . '/../config/config.php'` (and `.../config/versions_config.php`)** across `public/*.php` and `src/*.php` in both `logg` and `logdev` (same files as the versions-centralization touchpoints in §3.5: `TestLogRepository.php`, `index.php`, `details.php`, `rerun.php`, `vm_config.php`, `post.php`, `check.php`, `sync_main.php`, `update_testset_stats.php`, `update_validation.php`) becomes:
+2. **Every `require_once __DIR__ . '/../../_config/config.php'` (and `.../_config/versions_config.php`)** across `public/*.php` and `src/*.php` in both `logg` and `logdev` (same files as the versions-centralization touchpoints in §3.5: `TestLogRepository.php`, `index.php`, `details.php`, `rerun.php`, `vm_config.php`, `post.php`, `check.php`, `sync_main.php`, `update_testset_stats.php`, `update_validation.php`) becomes:
    ```php
    require_once __DIR__ . '/../../_config/config.php';
    require_once __DIR__ . '/../../_config/versions_config.php';
@@ -455,7 +455,7 @@ Shared files: `css/theme.css` + `js/theme.js`.
 - [x] ~~Share `builds/` between logdev and logg~~ — done 09/04/2026: `versions.php` moved to `C:\xampp\htdocs\_builds\`, writes/reads `builds_versions.json` there, IIS rewrite rule added, `webTests.groovy` URL corrected. See §2.1/§2.2.
 - [ ] Share `deployedVM/` the same way `_builds` was done (§2.1) — confirm if an IIS rule is needed
 - [ ] Share `nightly/` between logdev and logg (§2.1) — approach not yet decided (duplicate scripts + shared data dir, vs. IIS alias)
-- [ ] `config/` → `htdocs/_config/` migration (§2.3) — decided, in progress: `SHARED_DATA_DIR` fix + all `require_once .../config/config.php` and `.../config/versions_config.php` paths across `logg` and `logdev` need updating to the new `../../_config/...` pattern
+- [ ] `config/` → `htdocs/_config/` migration (§2.3) — decided, in progress: `SHARED_DATA_DIR` fix + all `require_once .../_config/config.php` and `.../_config/versions_config.php` paths across `logg` and `logdev` need updating to the new `../../_config/...` pattern
 - [x] ~~Extend the centralization to `dash.php`~~ — done on 08/31/2026 (see §3.6)
 - [x] ~~Fix `LOGG_BASE_URL` picking up `localhost`/wrong port~~ — done 09/03/2026, see §3.7 (fix delivered to JD, not yet committed)
 - [ ] Inconsistency found while centralizing (08/28/2026): before this
