@@ -1,0 +1,54 @@
+[
+    {
+        "Build": "dev16",
+        "Version": "26.3.0.16660 #3116"
+    },
+    {
+        "Build": "dev17",
+        "Version": "27.2.1.17670 #3321"
+    },
+    {
+        "Build": "dev18",
+        "Version": "28.1.1.18670 #3322"
+    },
+    {
+        "Build": "hf16",
+        "Version": "26.2.11.16651 #3316"
+    },
+    {
+        "Build": "hf17",
+        "Version": "27.1.11.17651 #3318"
+    },
+    {
+        "Build": "rc16",
+        "Version": "26.3.0.16660 #3317"
+    },
+    {
+        "Build": "rc17",
+        "Version": "27.2.0.17660 #3319"
+    },
+    {
+        "Build": "rc18",
+        "Version": "28.1.0.18660 #3320"
+    },
+    {
+        "Build": "web_feat",
+        "Version": "27.2.0.17660 #3068"
+    },
+    {
+        "Build": "wedev",
+        "Version": "we DEV #e5214e"
+    },
+    {
+        "Build": "wefeat",
+        "Version": "we FEAT #b4d963"
+    },
+    {
+        "Build": "wehf",
+        "Version": "we HF #ca1b4a"
+    },
+    {
+        "Build": "werc",
+        "Version": "we RC #834513"
+    }
+]

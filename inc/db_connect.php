@@ -1,6 +1,13 @@
 <?php
-// Remplacer le contenu par :
-require_once __DIR__ . '/../../_config/config.php';
-require_once __DIR__ . '/../src/TestLogRepository.php';
-$testLogRepo = new TestLogRepository($pdo);
+/* Database connection start */
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "testcomplete";
+global $conn;
+$conn = mysqli_connect($servername, $username, $password, $dbname) or die("Connection failed: " . mysqli_connect_error());
+if (mysqli_connect_errno()) {
+    printf("Connect failed: %s\n", mysqli_connect_error());
+    exit();
+}
 ?>

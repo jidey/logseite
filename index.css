@@ -1,0 +1,37 @@
+.btn-group input[type="checkbox"] {
+    display: none;
+}
+
+.btn-group input[type="checkbox"] + .btn-group > label span {
+    width: 20px;
+}
+
+.btn-group input[type="checkbox"] + .btn-group > label span:first-child {
+    display: none;
+}
+.btn-group input[type="checkbox"] + .btn-group > label span:last-child {
+    display: inline-block;   
+}
+
+.btn-group input[type="checkbox"]:checked + .btn-group > label span:first-child {
+    display: inline-block;
+}
+.btn-group input[type="checkbox"]:checked + .btn-group > label span:last-child {
+    display: none;   
+}
+
+[data-toggle="buttons-radio"]>.btn>input[type="radio"] {
+    display: none;
+}
+
+[data-toggle="buttons-checkbox"]>.btn>input[type="checkbox"] {
+    display: none;
+}
+
+form {
+    display: inline-block; //Or display: inline; 
+}
+
+.center {
+text-align: center;
+}

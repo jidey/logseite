@@ -1,0 +1,334 @@
+﻿{
+  "de.itdesign.binaries": [
+    {
+      "artifact": "itdesign-binaries",
+      "classifier": "",
+      "type": "zip",
+      "version": "28.1.1.18670-rc-0036-b23a89177",
+      "target": "itd\\",
+      "description": ""
+    }
+  ],
+  "genesisWorld": [
+    {
+      "artifact": "genesisWorld",
+      "classifier": "",
+      "type": "",
+      "version": "28.1.2.18680",
+      "target": "",
+      "description": "45f311a0afbe2ec358fd699763b3329bf3b51b82"
+    }
+  ],
+  "de.cas.genesisworld.libraries": [
+    {
+      "artifact": "sql-transpiler",
+      "classifier": "source-only",
+      "type": "zip",
+      "version": "28.0.2-SNAPSHOT",
+      "target": "Source\\libs\\sql-transpiler\\",
+      "description": ""
+    }
+  ],
+  "de.cas.gw.server": [
+    {
+      "artifact": "de.cas.gw.server",
+      "classifier": "",
+      "type": "exe",
+      "version": "28.1.2.18680",
+      "target": "Server\\DotNet",
+      "description": "13a011a88ceff5c5f1155d96ec339cb85bdb7b78"
+    }
+  ],
+  "de.cas.officeintegration.teams.gw": [
+    {
+      "artifact": "de.cas.officeintegration.teams.gw",
+      "classifier": "",
+      "type": "exe",
+      "version": "1.1.1.0",
+      "target": "Server\\TeamsAddin",
+      "description": "CAS genesisWorld Microsoft Teams App"
+    }
+  ],
+  "de.cas.officeintegration.outlook": [
+    {
+      "artifact": "de.cas.officeintegration.outlook",
+      "classifier": "",
+      "type": "dll",
+      "version": "28.1.2.18680",
+      "target": "OfficeAddin\\Outlook",
+      "description": "4b93a92cbba8a75a8c7c90dfb42c8adf8c2e2568"
+    }
+  ],
+  "de.cas.officeintegration.word": [
+    {
+      "artifact": "de.cas.officeintegration.word",
+      "classifier": "",
+      "type": "dll",
+      "version": "28.1.2.18680",
+      "target": "OfficeAddin\\Word",
+      "description": "4b93a92cbba8a75a8c7c90dfb42c8adf8c2e2568"
+    }
+  ],
+  "de.cas.java.graalvm": [
+    {
+      "artifact": "graalvm-ce",
+      "classifier": "x86_64",
+      "type": "zip",
+      "version": "25.1.3",
+      "target": "Server\\JavaServices\\jdk\\",
+      "description": ""
+    }
+  ],
+  "de.cas.mobilesync": [
+    {
+      "artifact": "de.cas.mobilesync.executable.jar",
+      "classifier": "",
+      "type": "jar",
+      "version": "1.6.0",
+      "target": "Server\\JavaServices\\mobile-sync.jar",
+      "description": ""
+    }
+  ],
+  "de.cas.sync.solutions": [
+    {
+      "artifact": "exchangesync-service-wrapper",
+      "classifier": "",
+      "type": "jar",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\exchange-sync.jar",
+      "description": ""
+    },
+    {
+      "artifact": "de.cas.gw.sync.exchange.runner",
+      "classifier": "",
+      "type": "jar",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\exchange_sync\\startExchangeSync.jar",
+      "description": ""
+    },
+    {
+      "artifact": "de.cas.gw.sync.exchange.runner",
+      "classifier": "exchangeSyncLibs",
+      "type": "zip",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\exchange_sync\\lib\\",
+      "description": "4a3886c26c392e979f43e7ad5a7f94f580023d87"
+    },
+    {
+      "artifact": "de.cas.gw.sync.exchange.runner",
+      "classifier": "exchangeSyncMappings",
+      "type": "zip",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\exchange_sync\\mappings\\",
+      "description": ""
+    }
+  ],
+  "de.cas.gw": [
+    {
+      "artifact": "mobileservices-service-wrapper",
+      "classifier": "",
+      "type": "jar",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\mobile-apps.jar",
+      "description": ""
+    },
+    {
+      "artifact": "opensync-administration-wrapper",
+      "classifier": "",
+      "type": "jar",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\opensync\\opensync.jar",
+      "description": ""
+    },
+    {
+      "artifact": "opensync-administration-wrapper",
+      "classifier": "openSyncAdminDropIns",
+      "type": "zip",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\opensync\\dropins\\",
+      "description": ""
+    },
+    {
+      "artifact": "elasticsearch-runtime",
+      "classifier": "runtime",
+      "type": "zip",
+      "version": "9.4.2.1",
+      "target": "Server\\JavaServices\\elasticsearch\\",
+      "description": ""
+    },
+    {
+      "artifact": "elasticsearch-runtime",
+      "classifier": "configuration",
+      "type": "zip",
+      "version": "9.4.2.1",
+      "target": "Server\\JavaServices\\configuration\\",
+      "description": ""
+    },
+    {
+      "artifact": "rabbitmq-runtime",
+      "classifier": "runtime",
+      "type": "zip",
+      "version": "27.0.2",
+      "target": "Server\\JavaServices\\rabbitmq_server\\",
+      "description": ""
+    },
+    {
+      "artifact": "rabbitmq-runtime",
+      "classifier": "configuration",
+      "type": "zip",
+      "version": "27.0.2",
+      "target": "Server\\JavaServices\\configuration\\",
+      "description": ""
+    }
+  ],
+  "de.cas.gw.features": [
+    {
+      "artifact": "cas-gw-open-sync-execution-feature",
+      "classifier": "syncExecutionClasses",
+      "type": "zip",
+      "version": "12.0.1",
+      "target": "Server\\JavaServices\\opensync\\classes\\",
+      "description": ""
+    }
+  ],
+  "de.cas.smartdesign": [
+    {
+      "artifact": "application.runnable.gw",
+      "classifier": "",
+      "type": "jar",
+      "version": "14.2.0-SNAPSHOT",
+      "target": "Server\\JavaServices\\smartdesign\\smartdesign.jar",
+      "description": "85e056595cf44fc5cdd167f7ebf76c6a0f4b7986"
+    },
+    {
+      "artifact": "jfr.settings",
+      "classifier": "default",
+      "type": "jfc",
+      "version": "14.2.0-SNAPSHOT",
+      "target": "Server\\JavaServices\\smartdesign\\default.jfc",
+      "description": ""
+    },
+    {
+      "artifact": "jfr.settings",
+      "classifier": "profile",
+      "type": "jfc",
+      "version": "14.2.0-SNAPSHOT",
+      "target": "Server\\JavaServices\\smartdesign\\profile.jfc",
+      "description": ""
+    }
+  ],
+  "com.microsoft.sqlserver": [
+    {
+      "artifact": "mssql-jdbc_auth",
+      "classifier": "",
+      "type": "dll",
+      "version": "9.2.1.x64",
+      "target": "Server\\JavaServices\\jdk\\bin\\mssql-jdbc_auth-9.2.1.x64.dll",
+      "description": ""
+    },
+    {
+      "artifact": "mssql-jdbc_auth",
+      "classifier": "",
+      "type": "dll",
+      "version": "9.2.1.x86",
+      "target": "Server\\JavaServices\\jdk\\bin\\mssql-jdbc_auth-9.2.1.x86.dll",
+      "description": ""
+    },
+    {
+      "artifact": "mssql-jdbc_auth",
+      "classifier": "",
+      "type": "dll",
+      "version": "13.4.0.x64",
+      "target": "Server\\JavaServices\\jdk\\bin\\mssql-jdbc_auth-13.4.0.x64.dll",
+      "description": ""
+    },
+    {
+      "artifact": "mssql-jdbc_auth",
+      "classifier": "",
+      "type": "dll",
+      "version": "13.4.0.x86",
+      "target": "Server\\JavaServices\\jdk\\bin\\mssql-jdbc_auth-13.4.0.x86.dll",
+      "description": ""
+    }
+  ],
+  "de.cas.identity": [
+    {
+      "artifact": "auth-server-gw-config-dir",
+      "classifier": "config-dir-x15",
+      "type": "zip",
+      "version": "4.2.0-SNAPSHOT",
+      "target": "Server\\JavaServices\\auth-server\\",
+      "description": ""
+    },
+    {
+      "artifact": "auth-server-core",
+      "classifier": "",
+      "type": "jar",
+      "version": "4.2.0-SNAPSHOT",
+      "target": "Server\\JavaServices\\auth-server\\auth-server.jar",
+      "description": ""
+    }
+  ],
+  "de.cas.smartsearch": [
+    {
+      "artifact": "cas-smartsearch-jar",
+      "classifier": "",
+      "type": "jar",
+      "version": "9.4.5",
+      "target": "Server\\JavaServices\\searchservice\\searchservice.jar",
+      "description": ""
+    },
+    {
+      "artifact": "cas-gw-smartsearch-config",
+      "classifier": "",
+      "type": "zip",
+      "version": "9.4.5",
+      "target": "Server\\JavaServices\\configuration\\",
+      "description": ""
+    }
+  ],
+  "de.cas.workflow": [
+    {
+      "artifact": "workflow-application",
+      "classifier": "",
+      "type": "jar",
+      "version": "2.0.2",
+      "target": "Server\\JavaServices\\business-process-automation\\business-process-automation.jar",
+      "description": ""
+    },
+    {
+      "artifact": "workflow-application",
+      "classifier": "default",
+      "type": "jfc",
+      "version": "2.0.2",
+      "target": "Server\\JavaServices\\business-process-automation\\default.jfc",
+      "description": ""
+    },
+    {
+      "artifact": "workflow-application",
+      "classifier": "profile",
+      "type": "jfc",
+      "version": "2.0.2",
+      "target": "Server\\JavaServices\\business-process-automation\\profile.jfc",
+      "description": ""
+    }
+  ],
+  "de.cas.smartaddon": [
+    {
+      "artifact": "de.cas.smartaddon",
+      "classifier": "",
+      "type": "exe",
+      "version": "101.0.0.2",
+      "target": "Versionbuilder\\ISSmartAddon\\CASSmartAddon\\CASSmartAddonSetup\\SINGLE_EXE_IMAGE\\DiskImages\\DISK1\\",
+      "description": "CAS SmartAddon"
+    },
+    {
+      "artifact": "de.cas.smartaddon",
+      "classifier": "",
+      "type": "msi",
+      "version": "101.0.0.2",
+      "target": "Versionbuilder\\ISSmartAddon\\CASSmartAddon\\CASSmartAddonSetup\\SINGLE_MSI_IMAGE\\DiskImages\\DISK1\\",
+      "description": "CAS SmartAddon"
+    }
+  ]
+}

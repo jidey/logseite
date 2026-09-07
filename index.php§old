@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Autotests</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" type="text/css" title="design" href="index.css"/>
+  <!-- jQuery library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <!-- Latest compiled JavaScript -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>  
+  
+  <script src="bootstable.js"></script>
+  <script type="Text/JavaScript">
+	function VerifyRun(id, value, LogVersion, reloading) 
+	{
+		$.ajax({
+			url: "check.php?autoid=" + id + "&value=" + value + "&LogVersion=" + LogVersion
+		})
+		
+		if(reloading === 1)
+		{
+			location.reload();
+		}
+	}
+  </script>
+</head>
+<body>
+	<?php	
+	include_once("inc/db_connect.php");
+	if (isset($_GET['LogVersion'])) 
+	{$LogVersion = $_GET['LogVersion'];}
+	else{$LogVersion = "x17_rc";}
+
+	if (isset($_GET['Product'])) 
+	{
+		$ProductFilter = $_GET['Product'];
+		$Product = $ProductFilter;
+	}
+	else
+	{
+		$ProductFilter= "gWWebSel";
+		$Product= "gWWebSel";
+	}	
+	
+	if (isset($_GET['Filter'])) 
+	{
+		$FilterResults = $_GET['Filter'];
+	}
+	else{$FilterResults = "no";}
+	
+	if (isset($_GET['Refresh'])) 
+	{$Refresh = $_GET['Refresh'];}
+	else{$Refresh = "no";}
+	
+	if (isset($_GET['ReRun'])) 
+	{$ReRun = $_GET['ReRun'];}
+	else{$ReRun = "no";}
+	
+	if (isset($_GET['tag'])) 
+	{$tag = $_GET['tag'];}
+	else{$tag = '';}
+	
+	if (isset($_GET['Versiontype'])) 
+	{$Versiontype = $_GET['Versiontype'];}
+	else{$Versiontype = "RC";}
+	
+	if (isset($_GET['Testtype'])) 
+	{$Testtype = $_GET['Testtype'];}
+	else{$Testtype = "rc_x17";}
+	
+	if (isset($_GET['TestBrowser'])) 
+	{$TestBrowser = $_GET['TestBrowser'];}
+	else{$TestBrowser = "chrome";}
+	
+	//DEBUG
+	/*echo "LogVersion " .$LogVersion."<br>";
+	echo "Testtype " .$Testtype."<br>";
+	echo "ProductFilter " .$ProductFilter."<br>";
+	*/
+	
+	$_SERVER['HTTP_HOST']='sqs-sel-cent1.cas-software.dev';
+	
+	if (substr($Testtype, 0, 2) <> "we" )
+		$LogVersionTrimmed = substr($LogVersion, 0, 3);
+	else
+		$LogVersionTrimmed = $LogVersion;
+	//echo "LogVersionTrimmed " .$LogVersionTrimmed."<br>";
+	$LastBuildNum = "";
+	include('lastbuild.php');
+	
+	if ($Product == 'gWClient')
+	{
+		if($Testtype == 'hf_x15')
+		{
+			$LogVersion='x15_gwhf';
+		}
+		else if($Testtype == 'hf_x16')
+		{
+			$LogVersion='x16_gwhf';
+		}
+		else if($Testtype == 'rc_x16')
+		{
+			$LogVersion='x16_gwrc';
+		}
+		else if($Testtype == 'dev_x16')
+		{
+			$LogVersion='x16_gwdev';
+		}
+		else if($Testtype == 'hf_x17')
+		{
+			$LogVersion='x17_gwhf';
+		}
+		else if($Testtype == 'rc_x17')
+		{
+			$LogVersion='x17_gwrc';
+		}
+		else if($Testtype == 'dev_x17')
+		{
+			$LogVersion='x17_gwdev';
+		}
+	}	
+	
+	echo "<img src=Titel.jpg style=\"width:250px;height:60px;\"align=\"right\">";
+	//Search ALL different Jenkins Jobs (JJobs)
+	if ($ProductFilter != "")
+	{
+		$selectJobs = "SELECT DISTINCT JJob FROM `".$LogVersion."` WHERE (Version='".$LogVersionTrimmed."' AND Product='".$ProductFilter."' AND TestLogTyp='Main' AND JJob != '' AND Testtype='".$Testtype."')";
+	}
+	else
+	{
+		if ($Testtype != '' )
+		{
+			$selectJobs = "SELECT DISTINCT JJob FROM `".$LogVersion."` WHERE (Version='".$LogVersionTrimmed."' AND TestLogTyp='Main' AND JJob != '' and Testtype = '".$Testtype."')";
+		}
+		else
+		{
+			$selectJobs = "SELECT DISTINCT JJob FROM `".$LogVersion."` WHERE (Version='".$LogVersionTrimmed."' AND TestLogTyp='Main' AND JJob != '')";
+		}
+	}
+	
+	$JobsList = $conn->query($selectJobs);	
+	
+	//DEBUG
+	//echo $selectJobs;
+	
+	?>
+	<div id="dom-target" style="display: none;">
+	<?php
+	echo trim($LogVersion);
+		/* You have to escape because the result
+		 will not be valid HTML otherwise. */
+	?>
+	</div>
+	
+	<div class="container-fluid">
+		<div class="dropdown">
+		  <?php		
+			include('mainmenu.php');				  			
+		  ?>
+		</div>			
+		<div class="panel">
+			<div class="panel-info">				
+				<?php 	
+					include('submenu.php');					
+				?>					
+			</div>
+		</div>
+	</div>
+	
+	<?php
+	if($JobsList != null)
+	{
+		if (mysqli_num_rows($JobsList) > 0)
+		{				
+			$i=0;						
+			while($JobsListrow = mysqli_fetch_assoc($JobsList))
+			{			
+				//Search ALL Last Runs for all Testsets				
+				$selectLastRuns = "SELECT l1.* FROM `".$LogVersion."` as l1 LEFT JOIN `".$LogVersion."` as l2 
+				ON (l1.JParam = l2.JParam and l1.jjob = l2.jjob AND l1.TestLogTyp = l2.TestLogTyp AND l1.Testtype = l2.Testtype AND l1.AutoID < l2.AutoID)
+				WHERE ((l1.JJob = '".$JobsListrow["JJob"]."' AND l1.Testtype = '".$Testtype."' AND l1.TestLogTyp = 'Main' AND l2.AutoID is NULL"; 
+				
+				if($FilterResults == 'yes')
+				{
+					// Filter only failed Tests
+					$selectLastRuns = $selectLastRuns . " AND ((l1.Build = \"\") OR (l1.TearDownFailed = \"0\" AND l1.TearDownWarning = \"0\" AND l1.TearDownPassed = \"0\") OR (l1.TearDownFailed != \"0\" OR l1.running = 2)) AND l1.checked !=1";
+				}
+				
+				//DEBUG
+				//echo "TestBrowser=".$TestBrowser."<br>";
+				//echo $JobsListrow["JJob"]."<br>";					
+				if($JobsListrow["JJob"] == 'Autotests-x12-gW-WebSelenium' or $JobsListrow["JJob"] == 'Autotests-x11-gW-WebSelenium' or $JobsListrow["JJob"]=='Autotests-We')
+				{
+					if($TestBrowser != "")
+					{
+						$selectLastRuns = $selectLastRuns . " AND l1.Browser = '".$TestBrowser."'";
+					}
+					else
+					{
+						if($ProductFilter != 'weWebSel')
+						{
+							$selectLastRuns = $selectLastRuns . " AND l1.Browser = 'chrome'";
+						}
+						else
+						{
+							$selectLastRuns = $selectLastRuns . " AND l1.Browser = 'firefox'";
+						}
+					}
+				}					
+				//if ($Product == "gWClient")
+				//{
+					$selectLastRuns = $selectLastRuns . ")) ORDER BY l1.RunDate DESC, l1.JBuild DESC";
+				/*}
+				else
+				{
+					$selectLastRuns = $selectLastRuns . ")) ORDER BY l1.TearDownFailed DESC, l1.TearDownWarning DESC, l1.RunDate DESC, l1.JBuild DESC";
+				}	*/				
+				
+				//DEBUG						
+				//echo $selectLastRuns ."<br><br>";
+				$sqlTestsList = $conn->query($selectLastRuns);	
+				if ($Product <> 'gWClient')
+				{
+					if (mysqli_num_rows($sqlTestsList) > 0)
+					{
+						if($Refresh == "yes")
+						{
+							while($row = mysqli_fetch_assoc($sqlTestsList)) 
+							{									
+								$urlcall = "https://sqs-sel-cent1.cas-software.dev/logs/details.php?Testtype=".$Testtype."&MainID=".$row["AutoID"]."&Filter=no&LogVersion=".$LogVersion."&JJob=".$row["JJob"]."&Build=".urlencode($row["Build"])."&TestProject=".$row["TCProj"];
+								//echo $urlcall."<br>";
+								$arrContextOptions=array(
+									"ssl"=>array(
+										"verify_peer"=>false,
+										"verify_peer_name"=>false,
+									),
+								);
+								
+								if ($row["running"] <> "2") {
+									file_get_contents($urlcall, false, stream_context_create($arrContextOptions));
+								}
+							}	
+							$sqlTestsList = $conn->query($selectLastRuns);	
+							
+						}
+						else if($ReRun == "yes")
+						{
+							while($row = mysqli_fetch_assoc($sqlTestsList))
+							{
+								if($row['JJob'] == "Autotests-Web-Grid" or $row['JJob'] == "Autotests-We-Grid"){
+									$urlcall = "https://sqs-sel-cent1.cas-software.dev/logs/runGridAllFailed.php?JJob=".$row["JJob"]."&Build=".urlencode($row["Build"])."&Testtype=".$Testtype."&LogVersion=".$LogVersion."&Product=".$Product."&TestBrowser=chrome&TestProject=".$row["TCProj"]."&MainID=".$row["AutoID"];
+									
+									//echo $urlcall."<br>";
+									$streamContext = stream_context_create([
+									'ssl' => [
+									'verify_peer'      => false,
+									'verify_peer_name' => false
+									]
+									]);
+									
+									file_get_contents($urlcall, false, $streamContext);	
+									//echo $row["JJob"]."<br>";
+								}
+																			
+							}	
+							$sqlTestsList = $conn->query($selectLastRuns);	
+						}
+					}
+				}
+				//echo "</div>";
+				
+				if (mysqli_num_rows($sqlTestsList) > 0)
+				{
+				$i=$i+1;
+				?>					
+				<div class="container-fluid">
+					<div class="panel-group">
+						<div class="panel panel-default">
+							<div class="panel-heading">
+								<h4 class="panel-title">
+								<!-- Jenkins Jobs -->
+								<?php
+									if($JobsListrow['JJob'] == "Autotests-Web-Grid" or $JobsListrow['JJob'] == "Autotests-We-Grid"){
+										echo '<button type="button" class="btn btn-primary btn-block btn-lg" data-toggle="collapse" data-target="#collapse'.$i.'">'.$JobsListrow["JJob"].' ('.$Testtype.')';	
+									}
+									else
+									{
+										echo '<button type="button" class="btn btn-default btn-block btn-lg" data-toggle="collapse" data-target="#collapse'.$i.'">'.$JobsListrow["JJob"].' ('.$Testtype.')';
+									}
+									
+								?>
+								</h4>
+							</div>	
+							<?php
+							if(mysqli_num_rows($JobsList)>1)
+							{
+								echo '<div id="collapse'.$i.'" class="panel-collapse collapse">';
+							}
+							else
+							{
+								echo '<div id="collapse'.$i.'" class="panel-collapse collapse in">';
+							}
+							
+							echo '<div id="jjob-target'.$i.'" style="display: none;">';
+							echo trim($JobsListrow["JJob"]);
+							echo "</div>";
+							?>
+							
+								<div class="panel-body">
+								<?php
+									$jobs = [
+										"Autotests-Debug",
+										"Autotests-Web-Grid",
+										"Autotests-We-Grid",
+										"Autotests-x14-gW",
+										"Autotests-x15-gW",
+										"Autotests-x16-gW"
+									];
+
+									if (in_array($JobsListrow["JJob"], $jobs)) {
+										echo '<table class="table table-bordered table-condensed" id="editableTable'.$i.'">';
+									}
+									else {
+										echo '<table style="width:100%">
+										  <tr>
+											<th><a href=deleteFeatureRun.php?LogVersion='.$LogVersion."&JJob=".$JobsListrow["JJob"].'><font color="red">DELETE: </font></a>';
+											echo $JobsListrow["JJob"] .' in '.$LogVersion;
+										  echo '</th></tr>
+										</table>';
+										echo '<table class="table table-bordered table-condensed">';											
+									}
+								?>															
+										<thead>												
+											<th style="text-align:center" class="col-xs-2">TestSet</th>
+											<th style="text-align:center" class="col-xs-2">Version Tested</th>								
+											<th style="text-align:center">Passed</th>
+											<th style="text-align:center">Failed</th>
+											<th style="text-align:center">Validated</th>
+											<?php
+												echo '<th style="text-align:center">Log</th>';
+												if ($ProductFilter <> 'gWClient')
+												{
+													echo '<th style="text-align:center" class="col-xs-1">Details</th>';
+												}
+												
+												if ($ProductFilter == 'gWClient')
+												{
+													echo '<th style="text-align:center" class="col-xs-1">Testnode</th>';	
+												}
+												
+												echo '<th style="text-align:center" class="col-xs-1">Duration</th>';
+												echo '<th style="text-align:center" class="col-xs-2">Date</th>';
+												echo '<th style="text-align:center" class="col-xs-3">Notes</th>';
+												//echo '<th style="text-align:center">ID</th>';
+												//echo '<th style="text-align:center" class="col-xs-1">Browser</th>';											
+											?>												
+										</thead>											
+										<?php
+										while($row = mysqli_fetch_assoc($sqlTestsList)) 
+										{								
+										?>		
+											<?php
+											echo "<tr id='".$row["JParam"]."'>";
+												//TestSet
+												if(substr($row["JParam"],0,1) == '@') 
+													echo "<td><a href=\"\logs\stats.php?LogVersion=".$LogVersion."&JJob=".$row["JJob"]."&Product=".$ProductFilter."&TestBrowser=".$TestBrowser."&Testtype=".$Testtype."&Filter=".$FilterResults."&TestProject=".$row["JParam"]."\"><font color='blue'><b>".$row["JParam"]."</b></font></a></td>";
+												else if ($row["JParam"] == 'appstests')
+													echo "<td><a href=\"\logs\stats.php?LogVersion=".$LogVersion."&JJob=".$row["JJob"]."&Product=".$ProductFilter."&TestBrowser=".$TestBrowser."&Testtype=".$Testtype."&Filter=".$FilterResults."&TestProject=".$row["JParam"]."\"><font color='blue'><b>".$row["JParam"]."</b></font></a></td>";
+												else
+													echo "<td><a href=\"\logs\stats.php?LogVersion=".$LogVersion."&JJob=".$row["JJob"]."&Product=".$ProductFilter."&TestBrowser=".$TestBrowser."&Testtype=".$Testtype."&Filter=".$FilterResults."&TestProject=".$row["JParam"]."\">".$row["JParam"]."</a></td>";
+												
+												//Tested Build - Version Tested
+												if (trim($LastBuildNum) == trim($row["Build"]))
+													echo "<td style=\"text-align:center\"><b><font color=\"green\">". trim($row["Build"]) ."</font></b></td>";
+												else
+												{														
+													if (strtotime($row["RunDate"]) < strtotime('-4 days'))
+													{
+														if (strtotime($row["RunDate"]) < strtotime('-10 days'))
+															echo "<td style=\"text-align:center\"><font color=\"red\">". trim($row["Build"]) ."</font></td>";		
+														else	
+															echo "<td style=\"text-align:center\"><font color=\"orange\">". trim($row["Build"]) ."</font></td>";		
+													}														
+													else
+														echo "<td style=\"text-align:center\"><font color=\"green\">". trim($row["Build"]) ."</font></td>";														
+												}
+												
+												//Passed/Verified/Failed
+												if(($row["TearDownPassed"]=='0') AND ($row["TearDownWarning"]=='0') AND ($row["TearDownFailed"]=='0') AND ($row["checked"] == 0))
+												{
+													$passed_tests=$row["TearDownPassed"]+$row["TearDownWarning"];
+													echo "<td style=\"text-align:center\" class=\"danger\">".$passed_tests."</td>";
+													//echo "<td style=\"text-align:center\" class=\"danger\">".$row["TearDownPassed"]."</td>";
+													//echo "<td style=\"text-align:center\" class=\"danger\">".$row["TearDownWarning"]."</td>";
+													echo "<td style=\"text-align:center\" class=\"danger\">".$row["TearDownFailed"]."</td>";
+												}
+												else
+												{
+													$passed_tests=$row["TearDownPassed"]+$row["TearDownWarning"];
+													echo "<td style=\"text-align:center\" class=\"success\"><b>".$passed_tests."</b></td>";
+													/*if ($row["TearDownWarning"] != "0")
+													{
+														echo "<td style=\"text-align:center\" class=\"warning\"><font color=\"orange\"><b>".$row["TearDownWarning"]."</b></font></td>";
+													}
+													else
+													{
+														echo "<td style=\"text-align:center\" class=\"success\">".$row["TearDownWarning"]."</td>";
+													}*/									
+													if ($row["TearDownFailed"] != "0")
+													{
+														echo "<td style=\"text-align:center\" class=\"danger\"><font color=\"red\"><b>".$row["TearDownFailed"]."</b></font></td>";
+													}
+													else
+													{
+														echo "<td style=\"text-align:center\" class=\"success\">".$row["TearDownFailed"]."</td>";
+													}
+												}
+												
+												//Validated
+												echo "<td style=\"text-align:center\">";									
+												if ($row["running"] == 2)
+												{
+													echo "<a href=\"\logs\index.php?LogVersion=".$LogVersion."&Testtype=".$row["Testtype"]."&Product=".$row["Product"]."\" onclick=\"javascript:VerifyRun(".$row["AutoID"].",3,'".$LogVersion."',1)\" class=\"btn btn-xs btn-danger\" role=\"button\">Runs X</a>";							
+												}
+												else
+												{
+													//Debug
+													//echo $row["checked"];
+													if ($row["checked"] == 0)
+													{
+														if(($row["TearDownPassed"]=='0') AND ($row["TearDownWarning"]=='0') AND ($row["TearDownFailed"]=='0'))
+														{
+															//echo "<style=\"text-align:center\" class=\"danger\">TODO<br>";
+															echo "<input type=\"checkbox\" name=\"testvalidation\" value=\"1\" onclick=\"javascript:VerifyRun(".$row["AutoID"].",1,'".$LogVersion."',0)\">";
+														}
+														else													
+														{
+														echo "<input type=\"checkbox\" name=\"testvalidation\" value=\"1\" onclick=\"javascript:VerifyRun(".$row["AutoID"].",1,'".$LogVersion."',0)\">";
+														}
+													}
+													else
+													{
+														echo "<input type=\"checkbox\" name=\"testvalidation\" value=\"0\" onclick=\"javascript:VerifyRun(".$row["AutoID"].",0,'".$LogVersion."',0)\" checked=\"checked\" >";
+													}
+												}
+												echo "</td>";	
+												
+												//Log
+												$LogLink = $row["LogLink"];
+												$old = array("http", "8080");
+												$new   = array("https", "8181");												
+												str_replace($old, $new, $row["LogLink"]);
+												
+												if($row["RunDate"] > "2023-05-15 15:00:00")
+												{
+													$old = array("Autotests-Web-Grid-x.7", "Autotests-We-Grid-x.7");
+													$new = array("SQS_Web_TestPipe", "SQS_Web_TestPipe");
+													$LogLink = str_replace($old, $new, $LogLink);
+												}
+												
+												if($row["Testtype"]=="we_feat" || $row["Testtype"]=="web_feat")
+												{
+													$old = array("SQS_Web_TestPipe");
+													$new = array("SQS_Web_FeatureTests");
+													$LogLink = str_replace($old, $new, $LogLink);
+												}
+												
+												if ($ProductFilter <> 'gWClient')
+													echo "<td style=\"text-align:center\"><a href=\"".$LogLink."\" target=\"_blank\"><i>Allure</i></a></td>";
+												else
+													echo "<td style=\"text-align:center\"><a href=\"".$LogLink."\" target=\"_blank\"><i>TestComplete</i></a></td>";													
+												
+												//Details													
+												if ($ProductFilter <> 'gWClient')
+												{
+													echo "<td style=\"text-align:center\"><a href=\"\logs\details.php?Failed=".$row["TearDownFailed"]."&Warning=".$row["TearDownWarning"]."&Passed=".$row["TearDownPassed"]."&MainID=".$row["AutoID"]."&TestProduct=".$row["Product"]."&Filter=".$FilterResults."&LogVersion=".$LogVersion."&JJob=".$row["JJob"]."&Testtype=".$Testtype."&Build=".urlencode($row["Build"])."&Browser=".$row["Browser"]."&TestProject=".$row["TCProj"]."\">Testcases</a></td>";
+												}
+												$actual_link = 'https://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];
+												
+												//Duration
+												if ($ProductFilter == "gWClient")
+												{
+												echo "<td style=\"text-align:center\"><i>".$row["TestNode"]."</i></td>";
+												}
+												echo "<td style=\"text-align:center\">".$row["RunDuration"]."</td>";																									
+												echo "<td style=\"text-align:center\">".$row["RunDate"]."</td>";
+												
+												//Notes
+												$notesql="SELECT testnotiz FROM `".$LogVersion."_tags` WHERE JParam='".$row["JParam"]."'";
+												if ($notesql != "")
+												{
+													$notesql1 = $conn->query($notesql);		
+													if (mysqli_num_rows($notesql1) > 0)
+													{
+														$testnotesrow = mysqli_fetch_assoc($notesql1);
+														echo "<td style=\"text-align:center\">".$testnotesrow["testnotiz"]."</td>";
+													}
+													else
+													{
+														echo "<td style=\"text-align:center\"></td>";
+													}
+												}
+												else
+												{
+													echo "<td style=\"text-align:center\"></td>";
+												}
+												
+												//ID
+												//echo "<td style=\"text-align:center\">".$row["AutoID"]."</td>";	
+												//echo "<td style=\"text-align:center\">".$row["Browser"]."</td>";
+										echo '</tr>';
+										}
+									echo "</table>";
+									
+									?>																													
+									
+									<table class="table table-bordered table-condensed">																					
+											<?php
+											//RUN ALL Failed												
+											//DEBUG
+											//echo $LogVersion."<br>";
+											//echo "#".$Product."#<br>";													
+											
+											$actual_link = 'https://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'];	
+											if($Product == "gWClient")
+											{
+												$test = "runfailed.php?JJob=".$JobsListrow["JJob"]."&Testtype=".$Testtype."&LogVersion=".$LogVersion."&TestProject=".$JobsListrow["JJob"]."&Product=".$ProductFilter."&url=".urlencode($actual_link)."&TestBrowser=".$TestBrowser;														
+											}
+											else
+											{
+												if($JobsListrow["JJob"] == "Autotests-We-Grid" or $JobsListrow["JJob"] == 'Autotests-Web-Grid')
+												{
+													
+													$test = "runSelfailed.php?JJob=".$JobsListrow["JJob"]."&Testtype=".$Testtype."&LogVersion=".$LogVersion."&TestProject=".$JobsListrow["JJob"]."&url=".urlencode($actual_link)."&TestBrowser=".$TestBrowser."&Product=".$ProductFilter;
+												
+													//echo $test."<br>";
+												}
+												else
+												{													
+													$test = "runSelFeat.php?JJob=".$JobsListrow["JJob"]."&Testtype=".$Testtype."&LogVersion=".$LogVersion."&TestProject=".$JobsListrow["JJob"]."&url=".urlencode($actual_link)."&TestBrowser=".$TestBrowser."&Product=".$ProductFilter;
+												}
+											}
+											echo '<td align="right"><a href='.$test.' target=_self><img title="Run ALL FAILED or OLD" src=clock.png></a>';	
+											$cancel = "cancel.php?JJob=".$JobsListrow["JJob"]."&Testtype=".$Testtype."&LogVersion=".$LogVersion;	
+											echo '<a href='.$cancel.' target=_self><img title="CLEAR RUNS" src=cancel.png alt= style=width:24px;height:24px;border:0></a></td>';
+											?>			
+									</table>
+								</div> 
+							</div> 
+						</div> 	
+					</div> 
+				</div>										
+				<?php								
+				}
+				//echo "<script src=\"bootstable.js\"></script>";
+				echo '<script src=editable'.$i.'.js></script>';						
+			}
+		}		
+	}
+	else
+	{
+		if ($Testtype == "")
+		{
+			echo "<center>Please select a Version</center>";
+		}
+		else
+		{
+			echo "<center>No results found</center>";
+		}
+	}
+	$conn->close();
+	?>
+</body>
+</html>
