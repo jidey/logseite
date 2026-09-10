@@ -35,6 +35,7 @@ $localrun = $_GET['localrun'] ?? ($formSubmitted ? 'no' : 'localrun');  // ✅ C
 $parallel = $_GET['parallel'] ?? 'no';                                  // ✅ Unchecked by default
 $retry    = $_GET['retry']    ?? ($formSubmitted ? 'no' : 'retry');     // ✅ Checked by default
 $DBServer = $_GET['DBServer'] ?? "SQL";  // SQL by default (SQL | PGS)
+$NodesNumber = isset($_GET['NodesNumber']) ? max(1, (int)$_GET['NodesNumber']) : 4;
 // Debug mode: when &DryRun=1 is present, ConfirmAndRun DISPLAYS the URLs
 // instead of sending them to Jenkins/check.php (nothing is executed).
 $dryRun = 0; //1 = active DryRun
@@ -180,13 +181,13 @@ if ($execute) {
 						   "&Product=" . urlencode($Product);
 
 				ConfirmAndRun($testOne, $runnOne, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
-							 $localrun, $parallel, $Build, $retry, $DBServer, false, $dryRun); // false = don't redirect yet
+							 $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, false, $dryRun); // false = don't redirect yet
 			}
 			header("Location: " . $logurl);
 			exit;
 		} else {
 		    ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
-		                 $localrun, $parallel, $Build, $retry, $DBServer, true, $dryRun);
+		                 $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, true, $dryRun);
 		}			 
     } elseif (isset($_GET['Abort'])) {
         header("Location: " . $logurl);
@@ -436,6 +437,18 @@ if ($execute) {
                 gap: 10px;
                 margin-top: 30px;
             }
+			
+			.checkbox-group .form-check select,
+			.checkbox-group .form-check input[type="number"] {
+				width: 100% !important;
+				max-width: 100%;
+			}
+
+			@media (max-width: 640px) {
+				.checkbox-group {
+					grid-template-columns: 1fr;
+				}
+			}
         </style>
     </head>
     <body>
@@ -458,14 +471,40 @@ if ($execute) {
                 </div>
 
                 <form method="GET" action="rerun.php" id="rerunForm">
-                    <!-- Jenkins Node Selection -->
-                    <div style="margin: 20px 0; padding: 15px; background: var(--bg-tertiary); border-radius: 6px;">
-                        <label for="jenkins-node" style="display: block; margin-bottom: 10px; font-weight: bold; color: var(--text-primary);">
-                            Jenkins Node:
-                        </label>
-                        <?php include('runsystems.php'); ?>
-                    </div>
+                    <!-- Jenkins Node / DB Server / Nodes Number : 3 colonnes -->
+					<div class="checkbox-group">
+						<div class="form-check">
+							<label class="form-check-label" for="jenkins-node" style="width:100%;">
+								<strong>Jenkins Node</strong><br>
+								<small>Execution node</small>
+							</label>
+							<div style="margin-top:8px; width:100%;">
+								<?php include('runsystems.php'); ?>
+							</div>
+						</div>
 
+						<div class="form-check">
+							<label class="form-check-label" for="DBServer" style="width:100%;">
+								<strong>DB Server</strong><br>
+								<small>Database backend</small>
+							</label>
+							<select class="form-select" id="DBServer" name="DBServer" style="margin-top:8px; width:100%;">
+								<option value="SQL" <?php echo ($DBServer === 'SQL') ? 'selected' : ''; ?>>SQL</option>
+								<option value="PGS" <?php echo ($DBServer === 'PGS') ? 'selected' : ''; ?>>PGS</option>
+							</select>
+						</div>
+
+						<div class="form-check">
+							<label class="form-check-label" for="NodesNumber" style="width:100%;">
+								<strong>Parallel Nodes</strong><br>
+								<small>Number of parallel nodes</small>
+							</label>
+							<input type="number" class="form-control" id="NodesNumber" name="NodesNumber"
+								   min="1" max="20" step="1"
+								   value="<?php echo htmlspecialchars($NodesNumber); ?>"
+								   style="margin-top:8px; width:100%;">
+						</div>
+					</div>
                     <!-- Options -->
                     <div class="checkbox-group">
                         <div class="form-check">
@@ -493,17 +532,7 @@ if ($execute) {
                                 <strong>Retry</strong><br>
                                 <small>Retry failing tests</small>
                             </label>
-                        </div>
-						<div class="form-check" style="grid-column: 1 / -1;">
-                            <label class="form-check-label" for="DBServer" style="width:100%;">
-                                <strong>DB Server</strong><br>
-                                <small>Database backend</small>
-                            </label>
-                            <select class="form-select" id="DBServer" name="DBServer" style="margin-top:8px; max-width:200px;">
-                                <option value="SQL" <?php echo ($DBServer === 'SQL') ? 'selected' : ''; ?>>SQL</option>
-                                <option value="PGS" <?php echo ($DBServer === 'PGS') ? 'selected' : ''; ?>>PGS</option>
-                            </select>
-                        </div>
+                        </div>						
                     </div>					
                     <!-- Hidden fields -->
                     <input type="hidden" name="JJob" value="<?php echo htmlspecialchars($JJob); ?>">
@@ -644,7 +673,7 @@ function sendGetRequest($url) {
     return ['code' => $httpCode, 'response' => $response, 'error' => $error];
 }
 
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $doRedirect = true, $dryRun) {
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, $doRedirect = true, $dryRun) {
     $Test_y = "&Test_Node=" . $Test_x;
 
     // Map the branches (testType -> Jenkins Git branch)
@@ -663,6 +692,10 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
         $test = $test . "&DBServer=" . urlencode($DBServer);
     }
 	
+	if (!empty($NodesNumber)) {
+		$test = $test . "&NodesNumber=" . urlencode($NodesNumber);
+	}
+
     if ($forDebug === 'true') {
         $feature = substr($JJob, 14, strlen($JJob));
         $test = $test . "&Feature=" . $feature;
