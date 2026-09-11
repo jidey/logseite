@@ -84,7 +84,7 @@ try {
     $autoID = (int)$mainRow['AutoID'];
 
 	// Reset Single Running State
-	if ($testname <> "@Dummy")
+	if ($testname <> "@dummy")
 	{
 		function debugQuery($query, $params) {
 			foreach ($params as $key => $value) {

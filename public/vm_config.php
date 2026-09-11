@@ -3,6 +3,9 @@
 // DB connection here, so only versions_config.php is loaded)
 require_once __DIR__ . '/../../_config/versions_config.php';
 require_once __DIR__ . '/../../_config/config.php';
+
+// Jenkins deploy job triggered by the "Update" buttons (remote trigger token = TCAUTO)
+const JENKINS_DEPLOY_JOB_URL = 'https://build-sqs.cas-software.dev/view/Deployments/job/SQS-gWServer-Deploy/';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,7 +50,7 @@ require_once __DIR__ . '/../../_config/config.php';
 
   <div class="container">
     <h1 class="mb-4 text-center">VM Nightly Update Configuration</h1>
-	<h4 class="mb-2 text-center"><a href="https://build-sqs.cas-software.dev/view/Deployments/job/SQS-gWServer-Deploy/" target="_blank">Jenkins Deploy</a></h4>
+	<h4 class="mb-2 text-center"><a href="<?php echo JENKINS_DEPLOY_JOB_URL; ?>" target="_blank">Jenkins Deploy</a></h4>
 	
     <!-- Nav tabs -->
     <ul class="nav nav-tabs mb-3" id="vmTabs" role="tablist">
@@ -103,6 +106,7 @@ require_once __DIR__ . '/../../_config/config.php';
 			  renderDeploymentRowWithComparison('last', 'lastSel', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_selenium', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
+              renderUpdateRow($branches, 'Selenium');
               ?>
             </tbody>
           </table>
@@ -135,6 +139,7 @@ require_once __DIR__ . '/../../_config/config.php';
 			  renderDeploymentRowWithComparison('last', 'lastRel', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_release', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
+              renderUpdateRow($branches, 'Release');
               ?>
             </tbody>
           </table>
@@ -206,6 +211,7 @@ require_once __DIR__ . '/../../_config/config.php';
 			  renderDeploymentRowWithComparisonTC('last', 'lastTes', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_testcomplete', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
+              renderUpdateRow($branches, 'Testcomplete');
               ?>
             </tbody>
           </table>
@@ -218,7 +224,7 @@ require_once __DIR__ . '/../../_config/config.php';
   <div class="toast-container position-fixed top-0 end-0 p-3">
     <div id="saveToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
-        <div class="toast-body">
+        <div class="toast-body" id="saveToastBody">
           Settings saved successfully!
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
@@ -260,6 +266,8 @@ require_once __DIR__ . '/../../_config/config.php';
           throw new Error(`Server error: ${response.statusText}`);
         }
         showToast();
+        // Only after a successful save: Jenkins reads the server-side state
+        refreshUpdateButtons();
       }).catch(err => {
         showError(err.message);
       });
@@ -276,14 +284,16 @@ require_once __DIR__ . '/../../_config/config.php';
               checkbox.checked = (state === "checked");
             }
           }
+          refreshUpdateButtons();
         })
         .catch(err => {
           showError("Failed to load checkbox states: " + err.message);
         });
     }
 
-    // Show toast success message
-    function showToast() {
+    // Show toast success message (default text = checkbox save confirmation)
+    function showToast(message) {
+      document.getElementById('saveToastBody').textContent = message || 'Settings saved successfully!';
       const toastEl = document.getElementById('saveToast');
       const toast = new bootstrap.Toast(toastEl);
       toast.show();
@@ -296,6 +306,64 @@ require_once __DIR__ . '/../../_config/config.php';
       modalBody.textContent = message;
       const modal = new bootstrap.Modal(modalEl);
       modal.show();
+    }
+
+    // "Update" buttons are only enabled when the "Nightly Update" checkbox of
+    // the same column is checked: the Jenkins pipeline skips the deployment
+    // ("Update DISABLED") otherwise. Buttons start disabled (server-rendered)
+    // until the saved states are loaded.
+    function refreshUpdateButton(btn) {
+      if (btn.dataset.busy === '1') {
+        return; // request in progress / post-trigger lock
+      }
+      const checkbox = document.querySelector(`input[data-key="${btn.dataset.nightlyKey}"]`);
+      const enabled = !!(checkbox && checkbox.checked);
+      btn.disabled = !enabled;
+      btn.title = enabled
+        ? `Trigger Jenkins deploy for ${btn.dataset.label}`
+        : 'Enable "Nightly Update" first';
+    }
+
+    function refreshUpdateButtons() {
+      document.querySelectorAll('button[data-nightly-key]').forEach(refreshUpdateButton);
+    }
+
+    // Trigger the Jenkins deploy job directly from the browser (GET on the
+    // buildWithParameters URL built server-side in renderUpdateRow()).
+    // Jenkins sends no CORS headers: 'no-cors' lets the GET go through, but the
+    // response is opaque, so only network errors can be detected here.
+    // The build result has to be checked in Jenkins itself.
+    function triggerUpdate(btn) {
+      const url = btn.dataset.url;
+      const label = btn.dataset.label;
+      const question = `Launch Jenkins deploy (FORCEUPDATE) for ${label}?\n\n`
+                     + `Running sessions on the VM will be killed.`;
+      if (!confirm(question)) {
+        return;
+      }
+
+      const originalHtml = btn.innerHTML;
+      btn.dataset.busy = '1';
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
+      fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store' })
+        .then(() => {
+          showToast(`Deploy request sent to Jenkins (${label}).`);
+          btn.innerHTML = '✓ Sent';
+          // Keep the button locked for a while to avoid double triggers
+          setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            delete btn.dataset.busy;
+            refreshUpdateButton(btn);
+          }, 10000);
+        })
+        .catch(err => {
+          btn.innerHTML = originalHtml;
+          delete btn.dataset.busy;
+          refreshUpdateButton(btn);
+          showError('Could not reach Jenkins: ' + err.message);
+        });
     }
 
     // Initialize on page load
@@ -350,6 +418,71 @@ function renderCheckboxRow($keys, $label) {
 		</div>
 	  </td>
 	HTML;
+  }
+  echo "</tr>";
+}
+
+// Maps a vm_config.php column to the Jenkins deploy job parameters:
+//   'x18hf'  -> branch 'hotfixx18', 'x18rc' -> 'rcx18', 'x18dev' -> 'devx18'
+//   Testcomplete columns carry the VM index: 'x17rc_2' -> 'rcx17' + System 'Testcomplete2'
+// Returns null when the column can't be mapped (button is then disabled).
+function vmColumnToJenkinsParams($branch, $system) {
+  if (!preg_match('/^x(\d{2})(hf|rc|dev)(?:_(\d))?$/', $branch, $m)) {
+	return null;
+  }
+  $prefixMap = ['hf' => 'hotfix', 'rc' => 'rc', 'dev' => 'dev'];
+  $vmIndex = $m[3] ?? '';
+
+  if ($system === 'Testcomplete') {
+	if ($vmIndex === '') {
+	  return null;
+	}
+	$jenkinsSystem = 'Testcomplete' . $vmIndex;
+  } else {
+	if ($vmIndex !== '') {
+	  return null;
+	}
+	$jenkinsSystem = $system;
+  }
+
+  return [
+	'branch' => $prefixMap[$m[2]] . 'x' . $m[1],
+	'System' => $jenkinsSystem,
+  ];
+}
+
+// Row with one "Update" button per VM column. Each button carries the full
+// Jenkins URL (GET, token=TCAUTO, FORCEUPDATE=true); the other job parameters
+// keep their pipeline defaults.
+// Buttons are rendered disabled; JS enables them when the matching
+// "Nightly Update" checkbox (key = <column>_<system>) is checked.
+// $system: 'Selenium' | 'Release' | 'Testcomplete'
+function renderUpdateRow($branches, $system) {
+  echo "<tr><th>Manual Update</th>";
+  foreach ($branches as $branch) {
+	$params = vmColumnToJenkinsParams($branch, $system);
+	if ($params === null) {
+	  $b = htmlspecialchars($branch, ENT_QUOTES);
+	  echo "<td><button type='button' class='btn btn-sm btn-secondary' disabled title='No Jenkins mapping for {$b}'>Update</button></td>";
+	  continue;
+	}
+
+	$url = JENKINS_DEPLOY_JOB_URL . 'buildWithParameters?' . http_build_query([
+	  'token'       => 'TCAUTO',
+	  'delay'       => '0sec',
+	  'branch'      => $params['branch'],
+	  'System'      => $params['System'],
+	  'FORCEUPDATE' => 'true',
+	]);
+	$label = "{$params['branch']} / {$params['System']}";
+
+	// Same key as the "Nightly Update" checkbox of this column (renderCheckboxRow)
+	$nightlyKey = $branch . '_' . strtolower($system);
+
+	$safeUrl   = htmlspecialchars($url, ENT_QUOTES);
+	$safeLabel = htmlspecialchars($label, ENT_QUOTES);
+	$safeKey   = htmlspecialchars($nightlyKey, ENT_QUOTES);
+	echo "<td><button type='button' class='btn btn-sm btn-primary' disabled data-url='{$safeUrl}' data-label='{$safeLabel}' data-nightly-key='{$safeKey}' title='Enable &quot;Nightly Update&quot; first' onclick='triggerUpdate(this)'>Update</button></td>";
   }
   echo "</tr>";
 }
