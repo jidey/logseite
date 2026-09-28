@@ -103,10 +103,10 @@ const JENKINS_DEPLOY_JOB_URL = 'https://build-sqs.cas-software.dev/view/Deployme
             <tbody>
               <?php
               renderLastBuildRow('last', $branches);
-			  renderDeploymentRowWithComparison('last', 'lastSel', $branches, $suffixes);
+			  $upToDate = renderDeploymentRowWithComparison('last', 'lastSel', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_selenium', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
-              renderUpdateRow($branches, 'Selenium');
+              renderUpdateRow($branches, 'Selenium', $upToDate);
               ?>
             </tbody>
           </table>
@@ -136,10 +136,49 @@ const JENKINS_DEPLOY_JOB_URL = 'https://build-sqs.cas-software.dev/view/Deployme
             <tbody>
               <?php
               renderLastBuildRow('last', $branches);
-			  renderDeploymentRowWithComparison('last', 'lastRel', $branches, $suffixes);
+			  $upToDate = renderDeploymentRowWithComparison('last', 'lastRel', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_release', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
-              renderUpdateRow($branches, 'Release');
+              renderUpdateRow($branches, 'Release', $upToDate);
+              ?>
+            </tbody>
+          </table>
+        </div>
+
+        <?php
+          // PGL VMs: additional release systems, not (yet) driven by
+          // _config/versions_config.php. Each entry maps:
+          //   host   -> VM host name (column header + link)
+          //   build  -> column key used for _builds/last<build>Build.txt
+          //   deploy -> suffix of _deployedVM/lastPGL<deploy>.txt
+          $pglVms = [
+            ['host' => 'sqs-pgl-x18-rc',  'build' => 'x18rc',  'deploy' => 'rc18Deploy'],
+            ['host' => 'sqs-pgl-x18-dev', 'build' => 'x18dev', 'deploy' => 'dev18Deploy'],
+          ];
+          $pglBranches = array_column($pglVms, 'build');
+          $pglSuffixes = array_column($pglVms, 'deploy');
+        ?>
+        <h5 class="mt-4 mb-2">PGL VMs</h5>
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped align-middle text-center">
+            <thead class="table-light">
+              <tr>
+                <th>System</th>
+                <?php
+                foreach ($pglVms as $vm) {
+                  $host = htmlspecialchars($vm['host'], ENT_QUOTES);
+                  echo "<th><a href='https://{$host}.cas-software.dev/smartdesign/' target='_blank'>{$host}</a></th>";
+                }
+                ?>
+              </tr>
+            </thead>
+            <tbody>
+              <?php
+              renderLastBuildRow('last', $pglBranches);
+              $upToDate = renderDeploymentRowWithComparison('last', 'lastPGL', $pglBranches, $pglSuffixes);
+              $checkboxKeys = array_map(fn($b) => $b.'_pgl', $pglBranches);
+              renderCheckboxRow($checkboxKeys, "Nightly Update");
+              renderUpdateRow($pglBranches, 'PGL', $upToDate);
               ?>
             </tbody>
           </table>
@@ -208,10 +247,10 @@ const JENKINS_DEPLOY_JOB_URL = 'https://build-sqs.cas-software.dev/view/Deployme
             <tbody>
               <?php
               renderLastBuildRowTC('last', $branches);
-			  renderDeploymentRowWithComparisonTC('last', 'lastTes', $branches, $suffixes);
+			  $upToDate = renderDeploymentRowWithComparisonTC('last', 'lastTes', $branches, $suffixes);
 			  $checkboxKeys = array_map(fn($b) => $b.'_testcomplete', $branches);
               renderCheckboxRow($checkboxKeys, "Nightly Update");
-              renderUpdateRow($branches, 'Testcomplete');
+              renderUpdateRow($branches, 'Testcomplete', $upToDate);
               ?>
             </tbody>
           </table>
@@ -315,6 +354,11 @@ const JENKINS_DEPLOY_JOB_URL = 'https://build-sqs.cas-software.dev/view/Deployme
     function refreshUpdateButton(btn) {
       if (btn.dataset.busy === '1') {
         return; // request in progress / post-trigger lock
+      }
+      if (btn.dataset.upToDate === '1') {
+        btn.disabled = true;
+        btn.title = 'VM already runs the last build';
+        return;
       }
       const checkbox = document.querySelector(`input[data-key="${btn.dataset.nightlyKey}"]`);
       const enabled = !!(checkbox && checkbox.checked);
@@ -456,10 +500,12 @@ function vmColumnToJenkinsParams($branch, $system) {
 // keep their pipeline defaults.
 // Buttons are rendered disabled; JS enables them when the matching
 // "Nightly Update" checkbox (key = <column>_<system>) is checked.
-// $system: 'Selenium' | 'Release' | 'Testcomplete'
-function renderUpdateRow($branches, $system) {
+// $system: 'Selenium' | 'Release' | 'PGL' | 'Testcomplete'
+// $upToDate: per-column booleans returned by renderDeploymentRowWithComparison*();
+// a column whose VM already runs the last build keeps its button disabled.
+function renderUpdateRow($branches, $system, $upToDate = []) {
   echo "<tr><th>Manual Update</th>";
-  foreach ($branches as $branch) {
+  foreach ($branches as $i => $branch) {
 	$params = vmColumnToJenkinsParams($branch, $system);
 	if ($params === null) {
 	  $b = htmlspecialchars($branch, ENT_QUOTES);
@@ -482,13 +528,15 @@ function renderUpdateRow($branches, $system) {
 	$safeUrl   = htmlspecialchars($url, ENT_QUOTES);
 	$safeLabel = htmlspecialchars($label, ENT_QUOTES);
 	$safeKey   = htmlspecialchars($nightlyKey, ENT_QUOTES);
-	echo "<td><button type='button' class='btn btn-sm btn-primary' disabled data-url='{$safeUrl}' data-label='{$safeLabel}' data-nightly-key='{$safeKey}' title='Enable &quot;Nightly Update&quot; first' onclick='triggerUpdate(this)'>Update</button></td>";
+	$isUpToDate = !empty($upToDate[$i]) ? '1' : '0';
+	echo "<td><button type='button' class='btn btn-sm btn-primary' disabled data-url='{$safeUrl}' data-label='{$safeLabel}' data-nightly-key='{$safeKey}' data-up-to-date='{$isUpToDate}' title='Enable &quot;Nightly Update&quot; first' onclick='triggerUpdate(this)'>Update</button></td>";
   }
   echo "</tr>";
 }
 
 function renderDeploymentRowWithComparison($buildPrefix, $deployPrefix, $branches, $suffixes) {
   echo "<tr><th>Deployed on VM</th>";
+  $upToDate = [];
 
   for ($i = 0; $i < count($branches); $i++) {
 	$branch = $branches[$i];
@@ -505,13 +553,18 @@ function renderDeploymentRowWithComparison($buildPrefix, $deployPrefix, $branche
 
 	$title = ($buildValue !== $deployValue) ? "title='Expected: $buildValue'" : "";
 	echo "<td class='$cellClass' $title>$safeDeploy</td>";
+
+	// Up to date only when a real build number is known and deployed
+	$upToDate[$i] = ($buildValue !== "N/A" && $buildValue === $deployValue);
   }
 
   echo "</tr>";
+  return $upToDate;
 }
 
 function renderDeploymentRowWithComparisonTC($buildPrefix, $deployPrefix, $branches, $suffixes) {
   echo "<tr><th>Deployed on VM</th>";
+  $upToDate = [];
 
   for ($i = 0; $i < count($branches); $i++) {
 	$branch = $branches[$i];
@@ -529,8 +582,12 @@ function renderDeploymentRowWithComparisonTC($buildPrefix, $deployPrefix, $branc
 
 	$title = ($buildValue !== $deployValue) ? "title='Expected: $buildValue'" : "";
 	echo "<td class='$cellClass' $title>$safeDeploy</td>";
+
+	// Up to date only when a real build number is known and deployed
+	$upToDate[$i] = ($buildValue !== "N/A" && $buildValue === $deployValue);
   }
 
   echo "</tr>";
+  return $upToDate;
 }
 ?>

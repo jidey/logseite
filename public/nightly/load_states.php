@@ -1,30 +1,33 @@
 <?php
 require_once __DIR__ . '/../../../_config/config.php';
 
-$keys = [
-  'x16hf_1_testcomplete',
-  'x17rc_1_testcomplete', 'x17rc_2_testcomplete',
-  'x18rc_1_testcomplete',
-  'x16dev_selenium', 'x16rc_selenium', 'x16hf_selenium',
-  'x17dev_selenium', 'x17rc_selenium', 'x17hf_selenium',
-  'x18dev_selenium', 'x18rc_selenium', 'x18hf_selenium',
-  'x16dev_release', 'x16rc_release', 'x16hf_release',
-  'x17dev_release', 'x17rc_release', 'x17hf_release',
-  'x18dev_release', 'x18rc_release', 'x18hf_release',
-  'wedev_smartwe', 'werc_smartwe', 'wehf_smartwe'  
-];
+// Returns every saved nightly checkbox state found in the shared
+// _nightly-data folder (one <key>.txt file per checkbox, written by
+// save_column.php). No hardcoded key list: any new column (PGL, x19, ...)
+// is picked up automatically as soon as its checkbox has been saved once.
+// Keys without a file are simply absent; vm_config.php leaves those
+// checkboxes unchecked and Jenkins defaults them to "unchecked".
 
+$dataDir = SHARED_DATA_DIR . '_nightly-data';
 $results = [];
 
-foreach ($keys as $key) {
-    $filename = SHARED_DATA_DIR . "_nightly-data/$key.txt";
-    if (file_exists($filename)) {
-        $results[$key] = trim(file_get_contents($filename));
-    } else {
-        $results[$key] = "unchecked";
+if (is_dir($dataDir)) {
+    foreach (glob($dataDir . DIRECTORY_SEPARATOR . '*.txt') ?: [] as $filename) {
+        $key = basename($filename, '.txt');
+
+        // Only expose well-formed keys (e.g. x18rc_pgl, x17rc_2_testcomplete)
+        if (!preg_match('/^[a-z0-9_]+$/i', $key)) {
+            continue;
+        }
+
+        $state = trim((string) @file_get_contents($filename));
+        $results[$key] = ($state === 'checked') ? 'checked' : 'unchecked';
     }
 }
 
+// Never let IIS or the browser cache this list
 header('Content-Type: application/json');
-echo json_encode($results);
-?>
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
+echo json_encode((object) $results);
