@@ -38,6 +38,45 @@ function buildPaginationUrl($pageNum, $product, $testType, $browser, $testsetFil
 }
 
 /**
+ * Build the server URL based on product and version
+ * Examples:
+ * - gWWebSel, hf_x18 -> https://sqs-sel-x18hf.cas-software.dev/smartdesign/
+ * - gWWebSel, rc_x17 -> https://sqs-sel-x17rc.cas-software.dev/smartdesign/
+ * - weWebSel (SmartWe), hf_x18 -> https://sqs-smartwe-hotfix.internalk8s.home.cas.de/identity/login?ongoing=app
+ * - weWebSel (SmartWe), rc_x18 -> https://sqs-smartwe-rc.internalk8s.home.cas.de/identity/login?ongoing=app
+ * - weWebSel (SmartWe), dev_x18 -> https://sqs-smartwe-dev.internalk8s.home.cas.de/identity/login?ongoing=app
+ */
+function getServerUrlForVersion($testType, $product) {
+    $isSmartWe = (strpos($product, 'weWebSel') !== false || strpos($product, 'weClient') !== false || 
+                  strpos($product, 'smartWe') !== false || strpos($product, 'SmartWe') !== false);
+    
+    $parts = explode("_", $testType);
+    if (count($parts) !== 2) {
+        return null; // Invalid format
+    }
+    
+    $branch = strtolower($parts[0]); // dev, rc, hf
+    $version = strtolower($parts[1]); // x16, x17, x18, x19, etc.
+    
+    if ($isSmartWe) {
+        // SmartWe: map branch to the correct subdomain
+        // hf -> hotfix, rc -> rc, dev -> dev
+        $branchMap = [
+            'hf' => 'hotfix',
+            'rc' => 'rc',
+            'dev' => 'dev'
+        ];
+        
+        $smartWeBranch = isset($branchMap[$branch]) ? $branchMap[$branch] : $branch;
+        return "https://sqs-smartwe-" . $smartWeBranch . ".internalk8s.home.cas.de/identity/login?ongoing=app";
+    } else {
+        // gWWebSel / gWClient: version + branch (x18hf, x17rc, x16dev)
+        $serverPart = $version . $branch;
+        return "https://sqs-sel-" . $serverPart . ".cas-software.dev/smartdesign/";
+    }
+}
+
+/**
  * Get the deployed build from deployedVM folder
  */
 function getDeployedBuild($testType, $product) {
@@ -425,10 +464,19 @@ if (empty($testTypesForProduct)) {
                             <?php
                                 $deployedBuild = getDeployedBuild($testType, $product);
                                 if (!empty($deployedBuild)) {
+                                    $serverUrl = getServerUrlForVersion($testType, $product);
                                     echo '<div style="font-size: 20px;">';
-                                    echo '<strong>Deployed Build:</strong> <span style="color: #28a745; font-weight: bold;">' . htmlspecialchars($deployedBuild) . '</span>';
+                                    echo '<strong>Deployed Build:</strong> ';
+                                    
+                                    if ($serverUrl) {
+                                        echo '<a href="' . htmlspecialchars($serverUrl) . '" target="_blank" style="color: #28a745; font-weight: bold; text-decoration: none;" title="Click to open server for this version">';
+                                        echo htmlspecialchars($deployedBuild);
+                                        echo '</a>';
+                                    } else {
+                                        echo '<span style="color: #28a745; font-weight: bold;">' . htmlspecialchars($deployedBuild) . '</span>';
+                                    }
+                                    
                                     echo '</div>';
-                                    //echo '<script>console.log("📦 Deployed Build: ' . htmlspecialchars($deployedBuild) . '");</script>';
                                 } else {
                                     echo '<script>console.log("⚠️ No Deployed Build file found for: ' . htmlspecialchars($testType) . ' / ' . htmlspecialchars($product) . '");</script>';
                                 }
