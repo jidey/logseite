@@ -108,6 +108,99 @@
 		}
 	}
 
+	/**
+	 * Parse a RunDuration value into seconds + its format, so that two
+	 * durations can be added and written back in the format Jenkins sent.
+	 * Supported: "754" / "754.2" (numeric, unit kept as-is), "H:MM:SS", "MM:SS",
+	 * and labelled text such as "1 hr 2 min 3 sec", "12 min 34 sec", "1h 2m 3s".
+	 * Returns null when the value cannot be parsed.
+	 */
+	function parseDuration($value) {
+		$v = trim((string)$value);
+		if ($v === '') return null;
+
+		if (is_numeric($v)) {
+			return ['seconds' => (float)$v, 'format' => 'numeric'];
+		}
+		if (preg_match('/^(\d+):(\d{1,2}):(\d{1,2})$/', $v, $m)) {
+			return ['seconds' => $m[1] * 3600 + $m[2] * 60 + $m[3], 'format' => 'hms'];
+		}
+		if (preg_match('/^(\d+):(\d{1,2})$/', $v, $m)) {
+			return ['seconds' => $m[1] * 60 + $m[2], 'format' => 'ms'];
+		}
+
+		// Labelled text: every token must be "<number> <unit>"
+		$pattern = '/(\d+(?:[.,]\d+)?)\s*(ms|milliseconds?|h|hrs?|hours?|m|mins?|minutes?|s|secs?|seconds?)\b/i';
+		if (preg_match_all($pattern, $v, $all, PREG_SET_ORDER)) {
+			$rest = trim(preg_replace($pattern, '', $v), " \t,;");
+			if ($rest !== '') return null;   // unknown content -> do not guess
+
+			$seconds = 0.0;
+			$labels  = [];
+			foreach ($all as $tok) {
+				$num  = (float)str_replace(',', '.', $tok[1]);
+				$unit = strtolower($tok[2]);
+				if (preg_match('/^(ms|millisecond)/', $unit))      { $seconds += $num / 1000; $labels['ms'] = $tok[2]; }
+				elseif (preg_match('/^h/', $unit))                  { $seconds += $num * 3600; $labels['h'] = $tok[2]; }
+				elseif (preg_match('/^m/', $unit))                  { $seconds += $num * 60;   $labels['m'] = $tok[2]; }
+				else                                                { $seconds += $num;        $labels['s'] = $tok[2]; }
+			}
+			// Keep the input's spacing style ("12 min" vs "12m")
+			$sep = preg_match('/\d\s+[a-z]/i', $v) ? ' ' : '';
+			return ['seconds' => $seconds, 'format' => 'text', 'labels' => $labels, 'sep' => $sep];
+		}
+		return null;
+	}
+
+	/** Format a number of seconds using the format descriptor from parseDuration(). */
+	function formatDuration($seconds, array $fmt) {
+		switch ($fmt['format']) {
+			case 'numeric':
+				return (floor($seconds) == $seconds) ? (string)(int)$seconds : (string)round($seconds, 3);
+			case 'hms':
+				$s = (int)round($seconds);
+				return sprintf('%d:%02d:%02d', intdiv($s, 3600), intdiv($s % 3600, 60), $s % 60);
+			case 'ms':
+				$s = (int)round($seconds);
+				return sprintf('%d:%02d', intdiv($s, 60), $s % 60);
+			default: // text
+				$l   = $fmt['labels'] + ['h' => 'hr', 'm' => 'min', 's' => 'sec'];
+				$sep = $fmt['sep'];
+				$s   = (int)round($seconds);
+				$h   = intdiv($s, 3600);
+				$m   = intdiv($s % 3600, 60);
+				$sec = $s % 60;
+				$parts = [];
+				if ($h > 0)                          $parts[] = $h . $sep . $l['h'];
+				if ($m > 0 || ($h > 0 && $sec > 0))  $parts[] = $m . $sep . $l['m'];
+				if ($sec > 0 || empty($parts))       $parts[] = $sec . $sep . $l['s'];
+				return implode(' ', $parts);
+		}
+	}
+
+	/**
+	 * Add two RunDuration values. The result uses the format of $new.
+	 * If either value cannot be parsed, $new is returned unchanged
+	 * (= previous behavior, never worse than before).
+	 */
+	function addDurations($previous, $new) {
+		$p = parseDuration($previous);
+		$n = parseDuration($new);
+		if ($p === null || $n === null) {
+			error_log("post.php addDurations: cannot parse '$previous' + '$new', keeping '$new'");
+			return $new;
+		}
+		// Numeric values are unit-less: only add them together
+		if (($p['format'] === 'numeric') !== ($n['format'] === 'numeric')) {
+			error_log("post.php addDurations: mixed formats '$previous' + '$new', keeping '$new'");
+			return $new;
+		}
+		if ($n['format'] === 'text' && $p['format'] === 'text') {
+			$n['labels'] += $p['labels'];   // reuse unit labels seen in either value
+		}
+		return formatDuration($p['seconds'] + $n['seconds'], $n);
+	}
+
 	// Read and clean GET parameters
 	$JJob             = unquote($_GET['JJob'] ?? '');
 	$LogVersion       = $_GET['LogVersion'] ?? '';   // table name, no quotes
@@ -137,6 +230,9 @@
 	if ($tag === '')     $tag = '-';
 	if ($teamtag === '') $teamtag = '-';
 	if ($DBServer === '') $DBServer = 'SQL';
+
+	// Retry flag: sent by the Selenium project on the 2nd post (retry of failed scenarios)
+	$isRetry = in_array(strtolower(unquote($_GET['Retry'] ?? '')), ['1', 'true', 'yes'], true);
 
 	// Decode TCProj depending on product/version (Web/SmartWe)
 	$isWebOrWe = ($Product === 'gWWebSel' || $Product === 'weWebSel');
@@ -272,6 +368,29 @@
 		} else {
 			// TestLogTyp = Main: restricted DELETE on Main + INSERT
 			// (the original DELETE without TestLogTyp also wiped Single rows - fixed)
+
+			// Duration of a run = first pass + retry of the failed scenarios.
+			// The Selenium project posts the Main row twice per execution:
+			//   1st call (no Retry param) -> first pass: its duration REPLACES the
+			//                                stored one (new execution, even when
+			//                                the same build is relaunched)
+			//   2nd call (&Retry=1)       -> retry pass: its duration is ADDED to the
+			//                                duration of the Main row it replaces
+			// The row read here is the one the DELETE below removes (same key).
+			if ($isRetry) {
+				$stmtPrev = $pdo->prepare(
+					"SELECT RunDuration FROM `$LogVersion`
+					 WHERE TCProj = :tcproj AND Build = :build AND TestLogTyp = 'Main'
+					 ORDER BY AutoID DESC
+					 LIMIT 1"
+				);
+				$stmtPrev->execute([':tcproj' => $TCProj, ':build' => $Build]);
+				$prevMain = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+				if ($prevMain && trim((string)$prevMain['RunDuration']) !== '') {
+					$RunDuration = addDurations($prevMain['RunDuration'], $RunDuration);
+				}
+			}
+
 			$stmtDel = $pdo->prepare(
 				"DELETE FROM `$LogVersion`
 				 WHERE TCProj = :tcproj AND Build = :build AND TestLogTyp = 'Main'"
