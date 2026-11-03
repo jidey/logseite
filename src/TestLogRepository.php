@@ -237,6 +237,84 @@ class TestLogRepository {
             return null;
         }
     }
+
+    /**
+     * Single rows of the run of a TestSet (Main row): only the scenarios of the run, with every
+     * result of them up to the start of the next run of the TestSet.
+     *
+     * The run is delimited by RunDate, not by Build: smartWe Builds are git hashes, they have no
+     * order. The plugin posts the Main row after the Single rows of its pass (RunDate of a Single =
+     * end of the scenario, of the Main = time of the post), so the scenarios of the run are the
+     * Singles posted after the previous Main row and up to this one. The next run starts with its
+     * first Single of the next Main row's Build.
+     *
+     * A failed scenario retested later (rerun from LOGG: no Main row) thus shows its retest result,
+     * while the renamed or removed scenarios of older runs are not counted. The rows are returned
+     * unordered and not deduplicated: callers keep the latest per TCProj.
+     *
+     * @param string $tableName
+     * @param array  $mainRow Main row with JJob, JParam and AutoID
+     * @return array
+     */
+    public function getRunScenarios(string $tableName, array $mainRow): array {
+        $testSet = [':jjob' => $mainRow['JJob'], ':jparam' => $mainRow['JParam']];
+        $autoID  = (int)$mainRow['AutoID'];
+
+        $main = $this->executeQuery(
+            "SELECT RunDate FROM `$tableName` WHERE AutoID = :autoid",
+            [':autoid' => $autoID]
+        );
+        if (empty($main)) {
+            return [];
+        }
+        $runEnd = $main[0]['RunDate'];
+
+        $prev = $this->executeQuery(
+            "SELECT RunDate FROM `$tableName`
+             WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Main' AND AutoID < :autoid
+             ORDER BY AutoID DESC
+             LIMIT 1",
+            $testSet + [':autoid' => $autoID]
+        );
+        $runStart = !empty($prev) ? $prev[0]['RunDate'] : null;
+
+        $next = $this->executeQuery(
+            "SELECT RunDate, Build FROM `$tableName`
+             WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Main' AND AutoID > :autoid
+             ORDER BY AutoID ASC
+             LIMIT 1",
+            $testSet + [':autoid' => $autoID]
+        );
+        $retestEnd = null;
+        if (!empty($next)) {
+            $nextStart = $this->executeQuery(
+                "SELECT MIN(RunDate) AS RunDate FROM `$tableName`
+                 WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Single' AND Build = :build
+                 AND RunDate > :runend AND RunDate <= :nextend",
+                $testSet + [':build' => $next[0]['Build'], ':runend' => $runEnd, ':nextend' => $next[0]['RunDate']]
+            );
+            $retestEnd = $nextStart[0]['RunDate'] ?? $next[0]['RunDate'];
+        }
+
+        $rows = $this->executeQuery(
+            "SELECT * FROM `$tableName`
+             WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Single'"
+             . ($runStart !== null ? " AND RunDate > :runstart" : "")
+             . ($retestEnd !== null ? " AND RunDate < :retestend" : ""),
+            $testSet
+             + ($runStart !== null ? [':runstart' => $runStart] : [])
+             + ($retestEnd !== null ? [':retestend' => $retestEnd] : [])
+        );
+
+        $runScenarios = [];
+        foreach ($rows as $row) {
+            if ($row['RunDate'] <= $runEnd) {
+                $runScenarios[$row['TCProj']] = true;
+            }
+        }
+
+        return array_values(array_filter($rows, fn($row) => isset($runScenarios[$row['TCProj']])));
+    }
     
     /**
      * Marks a run as checked

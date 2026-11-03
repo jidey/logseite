@@ -96,23 +96,12 @@ try {
     }
 
     // Get all Scenarios (Single) for this TestSet
-    // Query the database for scenarios with same JJob and JParam
+    // Scenarios of this run, with their later retests (same rows as sync_main.php)
     $tableName = $repo->getTableForTestType($testType, $product);
-
-    $query = "SELECT * FROM `$tableName`
-              WHERE JJob = :jjob
-              AND JParam = :jparam
-              AND TestLogTyp = 'Single'
-              ORDER BY AutoID DESC";
-
-    $stmt = $pdo->prepare($query);
-    $stmt->bindValue(':jjob', $testset['JJob'], PDO::PARAM_STR);
-    $stmt->bindValue(':jparam', $testset['JParam'], PDO::PARAM_STR);
-	$stmt->execute();
 
     // Group scenarios by ScenarioName (TCProj) and keep latest
     $scenarioMap = [];
-    $allScenarios = $stmt->fetchAll();
+    $allScenarios = $repo->getRunScenarios($tableName, $testset);
 
     // Debug: check the available columns
     if (!empty($allScenarios)) {

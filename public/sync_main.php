@@ -64,9 +64,11 @@ try {
     $repo      = new TestLogRepository($pdo);
     $tableName = $repo->getTableForTestType($testType, $product);
 
-    // --- 1. Find the AutoID of the Main row ---
+    // --- 1. Find the latest Main row of the TestSet ---
+    // Not restricted to the Build: a rerun of failed scenarios from LOGG tests a more recent Build
+    // and posts no Main row, its results belong to the latest run.
     $stmtMain = $pdo->prepare(
-		"SELECT AutoID FROM `$tableName`
+		"SELECT AutoID, JJob, JParam, Build FROM `$tableName`
 		 WHERE JJob  = :jjob
 		 AND   JParam = :jparam
 		 AND   TestLogTyp = 'Main'
@@ -78,7 +80,7 @@ try {
 
     if (!$mainRow) {
         http_response_code(404);
-        echo json_encode(['success' => false, 'error' => 'Main TestSet not found for given JJob/JParam/Build']);
+        echo json_encode(['success' => false, 'error' => 'Main TestSet not found for given JJob/JParam']);
         exit;
     }
     $autoID = (int)$mainRow['AutoID'];
@@ -120,16 +122,9 @@ try {
 	}
 	
     // --- 2. Get every scenario (Single) of this execution ---
-	$stmtScen = $pdo->prepare(
-		"SELECT DISTINCT TCProj, TearDownFailed, TearDownWarning, TearDownPassed, checked, RunDate
-		 FROM `$tableName`
-		 WHERE JJob  = :jjob
-		 AND   JParam = :jparam
-		 AND   TestLogTyp = 'Single'
-		 ORDER BY RunDate DESC"
-	);
-	$stmtScen->execute([':jjob' => $jJob, ':jparam' => $jParam]);
-    $allScenarios = $stmtScen->fetchAll(PDO::FETCH_ASSOC);
+	// Only the scenarios of the run with their later retests: the Single rows of the previous runs
+	// of the TestSet (renamed or removed scenarios included) are not counted.
+    $allScenarios = $repo->getRunScenarios($tableName, $mainRow);
 
     // --- 3. Deduplicate: keep the most recent per TCProj ---
     $scenarioMap = [];
