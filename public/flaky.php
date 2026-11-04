@@ -71,10 +71,10 @@ try {
     $scenSql = "SELECT s.TearDownFailed, s.TearDownWarning, s.checked
                 FROM `$LogVersion` s
                 INNER JOIN (
-                    SELECT TCProj, MAX(AutoID) AS maxid
+                    SELECT TCProj, ExampleKey, MAX(AutoID) AS maxid
                     FROM `$LogVersion`
                     WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Single'
-                    GROUP BY TCProj
+                    GROUP BY TCProj, ExampleKey
                 ) latest ON s.AutoID = latest.maxid";
     $scenStmt = $pdo->prepare($scenSql);
     $scenStmt->execute([':jjob' => $jjob, ':jparam' => $jparam]);

@@ -126,10 +126,10 @@ try {
 	// of the TestSet (renamed or removed scenarios included) are not counted.
     $allScenarios = $repo->getRunScenarios($tableName, $mainRow);
 
-    // --- 3. Deduplicate: keep the most recent per TCProj ---
+    // --- 3. Deduplicate: keep the most recent per TCProj + ExampleKey (example of a Scenario Outline) ---
     $scenarioMap = [];
     foreach ($allScenarios as $sc) {
-        $key = $sc['TCProj'];
+        $key = $sc['TCProj'] . "\x1F" . ($sc['ExampleKey'] ?? '');
         if (!isset($scenarioMap[$key]) ||
             strtotime($sc['RunDate']) > strtotime($scenarioMap[$key]['RunDate'])) {
             $scenarioMap[$key] = $sc;

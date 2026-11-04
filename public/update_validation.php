@@ -26,7 +26,10 @@ try {
     $isGwDesktop = (strpos($product, 'gWClient') !== false);
 
     // Centralized mapping in _config/versions_config.php (loaded via config.php)
-    if ($isSmartWe) {
+    // Feature branch runs: the testType IS the table name (as TestLogRepository::getTableForTestType)
+    if ($testType === 'web_feat' || $testType === 'we_feat') {
+        $tableName = $testType;
+    } elseif ($isSmartWe) {
         // SmartWe: we_* table depending on the branch, regardless of the x version
         if (stripos($testType, 'hf') !== false)      $tableName = 'we_hf';
         elseif (stripos($testType, 'rc') !== false)  $tableName = 'we_rc';

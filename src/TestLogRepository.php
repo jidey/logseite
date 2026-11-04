@@ -270,13 +270,14 @@ class TestLogRepository {
         $runEnd = $main[0]['RunDate'];
 
         $prev = $this->executeQuery(
-            "SELECT RunDate FROM `$tableName`
+            "SELECT AutoID, RunDate FROM `$tableName`
              WHERE JJob = :jjob AND JParam = :jparam AND TestLogTyp = 'Main' AND AutoID < :autoid
              ORDER BY AutoID DESC
              LIMIT 1",
             $testSet + [':autoid' => $autoID]
         );
-        $runStart = !empty($prev) ? $prev[0]['RunDate'] : null;
+        $runStart  = !empty($prev) ? $prev[0]['RunDate'] : null;
+		$prevAutoID = !empty($prev) ? (int)$prev[0]['AutoID'] : 0;
 
         $next = $this->executeQuery(
             "SELECT RunDate, Build FROM `$tableName`
@@ -308,12 +309,15 @@ class TestLogRepository {
 
         $runScenarios = [];
         foreach ($rows as $row) {
-            if ($row['RunDate'] <= $runEnd) {
-                $runScenarios[$row['TCProj']] = true;
-            }
-        }
+			$createdInRun = (int)$row['AutoID'] > $prevAutoID && (int)$row['AutoID'] < $autoID;
+			// Key TCProj + ExampleKey: each example of a Scenario Outline is its own scenario
+			if ($row['RunDate'] <= $runEnd || $createdInRun) {
+				$runScenarios[$row['TCProj'] . '|' . ($row['ExampleKey'] ?? '')] = true;
+			}
+		}
 
-        return array_values(array_filter($rows, fn($row) => isset($runScenarios[$row['TCProj']])));
+        return array_values(array_filter($rows,
+            fn($row) => isset($runScenarios[$row['TCProj'] . '|' . ($row['ExampleKey'] ?? '')])));
     }
     
     /**

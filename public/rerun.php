@@ -26,6 +26,17 @@ $TCProjList = isset($_GET['TCProjList']) ? explode('|||', $_GET['TCProjList']) :
 $isBatch = !empty($TCProjList) && $_GET['TCProjList'] !== '';
 // AutoID of each failed scenario, aligned by index with $TCProjList
 $AutoIDList = isset($_GET['AutoIDList']) ? explode('|||', $_GET['AutoIDList']) : [];
+// Scenario Outline example: feature file + line of the example row (e.g. cucumber/testcases/x/Y.feature:35),
+// '' for a plain scenario. Sent to Jenkins as TestLine so only this example is rerun (the examples share the name).
+function validExampleLine($line) {
+    return preg_match('/^[\w.\/ -]+\.feature:\d+$/', (string)$line) ? $line : '';
+}
+$ExampleLine = validExampleLine($_GET['ExampleLine'] ?? '');
+// Batch mode: aligned by index with $TCProjList
+$ExampleLineList = isset($_GET['ExampleLineList']) ? explode('|||', $_GET['ExampleLineList']) : [];
+function testLineParam($line) {
+    return $line !== '' ? "&TestLine=" . urlencode($line) : '';
+}
 $TestName = $_GET['TestName'] ?? "";
 // An unchecked checkbox sends NOTHING in the query string.
 // The "checked by default" value must therefore only apply on the initial load,
@@ -38,7 +49,7 @@ $DBServer = $_GET['DBServer'] ?? "SQL";  // SQL by default (SQL | PGS)
 $NodesNumber = isset($_GET['NodesNumber']) ? max(1, (int)$_GET['NodesNumber']) : 4;
 // Debug mode: when &DryRun=1 is present, ConfirmAndRun DISPLAYS the URLs
 // instead of sending them to Jenkins/check.php (nothing is executed).
-$dryRun = 0; //1 = active DryRun
+$dryRun = (($_GET['DryRun'] ?? '') === '1') ? 1 : 0; // &DryRun=1: display the URLs instead of sending them
 // Determine the calling page (index.php or details.php)
 // If TCProj is present, the call comes from details.php (ReRun Testcase)
 // Otherwise, it comes from index.php (Run complete TestSet)
@@ -97,6 +108,24 @@ if (empty($LogVersion)) {
 $JJobJenkins = "SQS_Web_TestPipe";
 $ForDebug = 'false';
 
+// Feature branch runs (Testtype web_feat / we_feat, JJob "Autotests-Web-<branch>" / "Autotests-We-<branch>"):
+// Test_Version is a Jenkins CHOICE parameter, "web_feat" is not one of its values -> Jenkins refused the
+// request and no build started. Rerun on the current dev branch with the feature branch checked out and
+// DebugFeature=true, so that the results are logged back into the *_feat table.
+$featureBranch = '';
+$jenkinsTestType = $Testtype;   // key of $LOGG_JENKINS_BRANCH_MAP used for Test_Version
+if (($Testtype === 'web_feat' || $Testtype === 'we_feat')
+        && preg_match('/^Autotests-(?:Web|We)-(.+)$/', $JJob, $featureMatch)) {
+    $featureBranch = $featureMatch[1];
+    $ForDebug = 'true';
+    // newest active dev version (versions_config.php order: x16 ... x19)
+    foreach (array_keys($LOGG_JENKINS_BRANCH_MAP) as $versionKey) {
+        if (preg_match('/^dev_x\d+$/', $versionKey)) {
+            $jenkinsTestType = $versionKey;
+        }
+    }
+}
+
 // Build the test URL
 if ($Testset == $JParam && empty($TCProj)) {
 	$JParam = "@dummy";
@@ -108,7 +137,8 @@ if ($Testset == $JParam && empty($TCProj)) {
 		 $TCProjOutline = explode(" outline", $TCProj);
         $TCProj = $TCProjOutline[0];
 		$test = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins . 
-            "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . urlencode($TCProj) . 
+            "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . urlencode($TCProj) .
+            testLineParam($ExampleLine) .
             "&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;
     }
 	else {
@@ -166,6 +196,7 @@ if ($execute) {
 				// Rebuild the test URL for this specific scenario
 				$testOne = "https://build-sqs.cas-software.dev/view/gWWeb/job/" . $JJobJenkins .
 						   "/buildWithParameters?token=TCAUTO&delay=4sec&TestName=" . urlencode($oneTCProj) .
+						   testLineParam(validExampleLine($ExampleLineList[$idx] ?? '')) .
 						   "&Testset=" . $Testset . "&DebugFeature=" . $ForDebug;
 				if ($Product == "weWebSel")      $testOne .= "&Product=We";
 				elseif ($Product == "gWWebSel")  $testOne .= "&Product=Web";
@@ -180,13 +211,13 @@ if ($execute) {
 						   "&Testtype=" . urlencode($Testtype) .
 						   "&Product=" . urlencode($Product);
 
-				ConfirmAndRun($testOne, $runnOne, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
+				ConfirmAndRun($testOne, $runnOne, $logurl, $jenkinsTestType, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
 							 $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, false, $dryRun); // false = don't redirect yet
 			}
 			header("Location: " . $logurl);
 			exit;
 		} else {
-		    ConfirmAndRun($test, $runn, $logurl, $Testtype, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
+		    ConfirmAndRun($test, $runn, $logurl, $jenkinsTestType, $Test_x, $LogVersion, $TestBrowser, $JJob, $Hub, $ForDebug,
 		                 $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, true, $dryRun);
 		}			 
     } elseif (isset($_GET['Abort'])) {
@@ -467,6 +498,9 @@ if ($execute) {
                         <div><strong>Scenarios:</strong> <?php echo count($TCProjList); ?> failed test(s)</div>
                     <?php elseif (!empty($TCProj)): ?>
                         <div><strong>Scenario:</strong> <?php echo htmlspecialchars($TCProj); ?></div>
+                        <?php if ($ExampleLine !== ''): ?>
+                            <div><strong>Example:</strong> <?php echo htmlspecialchars($ExampleLine); ?></div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
 
@@ -547,10 +581,13 @@ if ($execute) {
                     <input type="hidden" name="TCProj" value="<?php echo htmlspecialchars($TCProj); ?>">
 					<input type="hidden" name="TCProjList" value="<?php echo htmlspecialchars($_GET['TCProjList'] ?? ''); ?>">
 					<input type="hidden" name="AutoIDList" value="<?php echo htmlspecialchars($_GET['AutoIDList'] ?? ''); ?>">
+					<input type="hidden" name="ExampleLine" value="<?php echo htmlspecialchars($ExampleLine); ?>">
+					<input type="hidden" name="ExampleLineList" value="<?php echo htmlspecialchars($_GET['ExampleLineList'] ?? ''); ?>">
                     <input type="hidden" name="TestName" value="<?php echo htmlspecialchars($TestName); ?>">
                     <input type="hidden" name="TestBrowser" value="<?php echo htmlspecialchars($TestBrowser); ?>">
                     <input type="hidden" name="Hub" value="<?php echo htmlspecialchars($Hub); ?>">
                     <input type="hidden" name="url" value="<?php echo htmlspecialchars($logurl); ?>">
+                    <?php if ($dryRun): ?><input type="hidden" name="DryRun" value="1"><?php endif; ?>
 
                     <!-- Buttons -->
                     <div class="button-group">
@@ -673,7 +710,7 @@ function sendGetRequest($url) {
     return ['code' => $httpCode, 'response' => $response, 'error' => $error];
 }
 
-function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, $doRedirect = true, $dryRun) {
+function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Browser, $JJob, $Hub, $forDebug, $localrun, $parallel, $Build, $retry, $DBServer, $NodesNumber, $doRedirect = true, $dryRun = 0) {
     $Test_y = "&Test_Node=" . $Test_x;
 
     // Map the branches (testType -> Jenkins Git branch)
@@ -699,6 +736,10 @@ function ConfirmAndRun($test, $runn, $logurl, $branch, $Test_x, $LogVersion, $Br
     if ($forDebug === 'true') {
         $feature = substr($JJob, 14, strlen($JJob));
         $test = $test . "&Feature=" . $feature;
+        // webTests.groovy checks out the test code of FeatureBranch ("Feature" is not one of its parameters)
+        if (preg_match('/^Autotests-(?:Web|We)-(.+)$/', $JJob, $m)) {
+            $test = $test . "&FeatureBranch=" . urlencode($m[1]);
+        }
     }
     
     // Select the hub

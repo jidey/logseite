@@ -209,6 +209,25 @@ try {
             }
         }
         
+        // A TestSet stays "Running" while at least one of its scenarios (Single) is running:
+        // scenario rerun from details.php, or failed scenario waiting for the retry pass (post.php Running=2)
+        try {
+            $runningTable = $repo->getTableForTestType($testType, $product);
+            $stmtRunning = $pdo->prepare(
+                "SELECT DISTINCT JJob, JParam FROM `$runningTable`
+                 WHERE TestLogTyp = 'Single' AND `running` = 2"
+            );
+            $stmtRunning->execute();
+            foreach ($stmtRunning->fetchAll(PDO::FETCH_ASSOC) as $runningRow) {
+                $runningKey = $runningRow['JJob'] . '|' . $runningRow['JParam'];
+                if (isset($testsets[$runningKey])) {
+                    $testsets[$runningKey]['running'] = 2;
+                }
+            }
+        } catch (Exception $e) {
+            error_log("index.php running scenarios error: " . $e->getMessage());
+        }
+
         // Apply filters
         $testsets = array_filter($testsets, function($testset) use ($testsetFilter, $teamTag, $errorOnly) { 	
             // Filter by TestSet name
@@ -1232,10 +1251,10 @@ if (empty($testTypesForProduct)) {
                 btnElement.style.opacity = '0.5';
                 btnElement.style.pointerEvents = 'none';
                 
-                fetch('check.php?value=0&field=running' +
-                      '&autoid=' + encodeURIComponent(this.dataset.autoid || '') +
-                      '&LogVersion=' + encodeURIComponent(testType) +
-                      '&Testtype=' + encodeURIComponent(testType) + 
+                // Reset the TestSet AND its scenarios (Main + Single rows of JJob/JParam):
+                // otherwise a running scenario would keep the TestSet "Running"
+                fetch('reset_running.php?' +
+                      'Testtype=' + encodeURIComponent(testType) +
                       '&Product=' + encodeURIComponent(product) +
                       '&JJob=' + encodeURIComponent(jJob) +
                       '&JParam=' + encodeURIComponent(jParam))

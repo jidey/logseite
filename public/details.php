@@ -13,6 +13,11 @@ require_once '../src/TestLogRepository.php';
 /**
  * Get the deployed build from deployedVM folder
  */
+/** Key of one scenario line: name + example of a Scenario Outline ('' for a plain scenario). */
+function scenarioKey(array $sc): string {
+    return ($sc['TCProj'] ?? 'Unknown') . "\x1F" . ($sc['ExampleKey'] ?? '');
+}
+
 function getDeployedBuild($testType, $product) {
     $deployFile = null;
 
@@ -82,6 +87,7 @@ $repo = new TestLogRepository($pdo);
 $error = null;
 $testset = null;
 $scenarios = [];
+$refBuild = '';
 
 try {
     if (!$autoID) {
@@ -99,7 +105,10 @@ try {
     // Scenarios of this run, with their later retests (same rows as sync_main.php)
     $tableName = $repo->getTableForTestType($testType, $product);
 
-    // Group scenarios by ScenarioName (TCProj) and keep latest
+    // Build of the TestSet: a row of another Build is a retest (badge in the table)
+    $refBuild = trim($testset['Build'] ?? '');
+
+    // Group scenarios by ScenarioName (TCProj) + example (ExampleKey) and keep latest
     $scenarioMap = [];
     $allScenarios = $repo->getRunScenarios($tableName, $testset);
 
@@ -109,7 +118,7 @@ try {
     }
 
     foreach ($allScenarios as $scenario) {
-        $scenarioName = $scenario['TCProj'] ?? 'Unknown'; // Using TCProj as Scenario name key
+        $scenarioName = scenarioKey($scenario); // TCProj + ExampleKey: one line per example of a Scenario Outline
 
         // Normalize the columns - look up teamtag regardless of case
         $normalizedScenario = [];
@@ -356,6 +365,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
             // applied to every failed scenario.
             $failedTCProjs = [];
             $failedAutoIDs = [];
+            $failedExampleLines = [];  // '' for a plain scenario, aligned by index with $failedTCProjs
             foreach ($scenarios as $sc) {
                 // Skip manually validated scenarios (checked = 1 => counted as Passed)
                 if (!empty($sc['checked'])) {
@@ -364,6 +374,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                 if (($sc['TearDownFailed'] ?? 0) > 0) {
                     $failedTCProjs[] = $sc['TCProj'] ?? '';
                     $failedAutoIDs[] = $sc['AutoID'] ?? '';
+                    $failedExampleLines[] = $sc['ExampleLine'] ?? '';
                 }
             }
             if (!empty($failedTCProjs)):
@@ -379,6 +390,7 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                     "&TestBrowser=". urlencode($browser ?? 'chrome') .
                     "&TCProjList=" . urlencode(implode('|||', $failedTCProjs)) .
                     "&AutoIDList=" . urlencode(implode('|||', $failedAutoIDs)) .
+                    "&ExampleLineList=" . urlencode(implode('|||', $failedExampleLines)) .
                                         "&url="        . urlencode(LOGG_BASE_URL . '/details.php?' .
                                     'Testtype=' . urlencode($testType) .
                                     '&Product=' . urlencode($product) .
@@ -436,11 +448,17 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                     <small class="scenario-name">
                                         <?php echo htmlspecialchars($scenario['TCProj'] ?? '-'); ?>
                                     </small>
+                                    <?php if (($scenario['Example'] ?? '') !== ''): ?>
+                                        <br><small class="text-muted scenario-example"><?php echo htmlspecialchars($scenario['Example']); ?></small>
+                                    <?php endif; ?>
                                 </td>
 
                                 <!-- Tested Build -->
                                 <td>
                                     <small><?php echo htmlspecialchars($scenario['Build'] ?? '-'); ?></small>
+                                    <?php if ($refBuild !== '' && trim($scenario['Build'] ?? '') !== $refBuild): ?>
+                                        <span class="badge bg-info text-dark" title="Retest on a newer build (TestSet build: <?php echo htmlspecialchars($refBuild); ?>)">retest</span>
+                                    <?php endif; ?>
                                 </td>
 
 								<!-- DB Server -->
@@ -489,6 +507,8 @@ $productsForVersion = $repo->getProductsForVersion($testType);
                                                    "&Testset=" . urlencode($testset['JParam'] ?? '') .
                                                    "&AutoID=" . urlencode($scenario['AutoID']) .
                                                    "&TCProj=" . urlencode($scenario['TCProj'] ?? '') .
+                                                   // example of a Scenario Outline: rerun only this example (feature:line)
+                                                   "&ExampleLine=" . urlencode($scenario['ExampleLine'] ?? '') .
                                                    "&Build=" . urlencode($buildForRun) .
                                                    "&Testtype=" . urlencode($testType) .
                                                    "&LogVersion=" . urlencode($testType) .

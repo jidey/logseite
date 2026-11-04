@@ -8,6 +8,9 @@
  * - JParam: Job parameter
  * - Testtype: Test type (rc_x17, etc.)
  * - Product: Product (gWWebSel, etc.)
+ * - LogVersion: (Optional) table name (x17_hf, web_feat, ...), as sent to post.php. Replaces
+ *               Testtype + Product: used by the Jenkins job at the end of a run (aborted, timeout, retry
+ *               that never posted) so that no TestSet stays "running".
  * - AutoID: (Optional) AutoID of a specific scenario - if provided, targets only that scenario
  */
 
@@ -25,25 +28,31 @@ try {
     $jParam = isset($_GET['JParam']) ? $_GET['JParam'] : null;
     $testType = isset($_GET['Testtype']) ? $_GET['Testtype'] : null;
     $product = isset($_GET['Product']) ? $_GET['Product'] : null;
+    $logVersion = isset($_GET['LogVersion']) ? trim($_GET['LogVersion']) : '';
     $autoID = isset($_GET['AutoID']) ? intval($_GET['AutoID']) : null;
-    
-    error_log("Parsed values - JJob: $jJob, JParam: $jParam, TestType: $testType, Product: $product, AutoID: $autoID");
-    
+
+    error_log("Parsed values - JJob: $jJob, JParam: $jParam, TestType: $testType, Product: $product, LogVersion: $logVersion, AutoID: $autoID");
+
     // Checks
     // If AutoID is provided, target by AutoID (JJob/JParam optional)
     // Otherwise, JJob + JParam are needed to target the testset
-    if (empty($testType) || empty($product)) {
-        throw new Exception("Missing required parameters: Testtype and Product");
+    if ($logVersion === '' && (empty($testType) || empty($product))) {
+        throw new Exception("Missing required parameters: LogVersion or (Testtype and Product)");
     }
     if (empty($autoID) && (empty($jJob) || empty($jParam))) {
         throw new Exception("Missing required parameters: AutoID or (JJob + JParam)");
     }
-    
-    // Create a Repository instance
-    $repo = new TestLogRepository($pdo);
 
-    // Get the table name
-    $tableName = $repo->getTableForTestType($testType, $product);
+    // Get the table name: LogVersion is the table itself, as in post.php
+    if ($logVersion !== '') {
+        if (!preg_match('/^[a-z0-9_]+$/i', $logVersion)) {
+            throw new Exception("Invalid table name");
+        }
+        $tableName = $logVersion;
+    } else {
+        $repo = new TestLogRepository($pdo);
+        $tableName = $repo->getTableForTestType($testType, $product);
+    }
     error_log("Table name: $tableName");
 
     // Build the UPDATE query

@@ -46,7 +46,10 @@ $tableMap = $product_table_map ?? [];
 
 // Determine the table name
 $tableName = "";
-if (!empty($Testtype) && !empty($Product) && isset($tableMap[$Testtype][$Product])) {
+if ($Testtype === 'web_feat' || $Testtype === 'we_feat') {
+    // Feature branch runs: the testType IS the table name (as TestLogRepository::getTableForTestType)
+    $tableName = $Testtype;
+} elseif (!empty($Testtype) && !empty($Product) && isset($tableMap[$Testtype][$Product])) {
     $tableName = $tableMap[$Testtype][$Product];
 }
 
