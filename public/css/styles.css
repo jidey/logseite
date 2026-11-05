@@ -704,6 +704,7 @@ img.lazy-loaded {
 /* Header buttons styling */
 .btn-primary,
 .btn-info,
+.btn-success,
 .btn-secondary {
     color: white !important;
     border-color: transparent !important;
@@ -724,6 +725,14 @@ img.lazy-loaded {
 
 .btn-info:hover {
     background-color: #138496 !important;
+}
+
+.btn-success {
+    background-color: #198754 !important;
+}
+
+.btn-success:hover {
+    background-color: #146c43 !important;
 }
 
 .btn-secondary {

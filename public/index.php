@@ -507,6 +507,9 @@ if (empty($testTypesForProduct)) {
                             <a href="dash.php" class="btn btn-sm btn-primary" target="_blank" title="Global Dashboard">
                                 📊 Release Dashboard
                             </a>
+                            <a href="status.php" class="btn btn-sm btn-success" target="_blank" title="Morning check report">
+                                🩺 Status
+                            </a>
                             <a href="vm_config.php" class="btn btn-sm btn-info" target="_blank" title="VM Nightly Deployments Configuration">
                                 ⚙️ Deployments
                             </a>
